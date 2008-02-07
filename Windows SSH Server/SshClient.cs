@@ -226,7 +226,7 @@ namespace WindowsSshServer
             this.CompressionAlgorithms.Add(new SshNoCompression());
         }
 
-        protected void SendMsgDisconnect(SshDisconnectReason reason, string description, 
+        protected void SendMsgDisconnect(SshDisconnectReason reason, string description,
             SshLanguage language)
         {
             // Create message to send.
@@ -466,37 +466,46 @@ namespace WindowsSshServer
             {
                 using (var msgReader = new SshStreamReader(msgStream))
                 {
-                    // Check message ID.
-                    switch (msgReader.ReadMessageId())
+                    try
                     {
-                        case SshMessage.Disconnect:
-                            ReadMsgDisconnect(msgReader);
-                            break;
-                        case SshMessage.Ignore:
-                            ReadMsgIgnore(msgReader);
-                            break;
-                        case SshMessage.Unimplemented:
-                            ReadMsgUnimplemented(msgReader);
-                            break;
-                        case SshMessage.Debug:
-                            ReadMsgDebug(msgReader);
-                            break;
-                        case SshMessage.ServiceRequest:
-                            ReadMsgServiceRequest(msgReader);
-                            break;
-                        case SshMessage.ServiceAccept:
-                            ReadMsgServiceAccept(msgReader);
-                            break;
-                        case SshMessage.KexInit:
-                            ReadMsgKexInit(msgReader);
-                            break;
-                        case SshMessage.NewKeys:
-                            ReadMsgNewKeys(msgReader);
-                            break;
-                        default:
-                            // Send Unimplemented message back to client.
-                            SendMsgUnimplemented();
-                            break;
+                        // Check message ID.
+                        switch (msgReader.ReadMessageId())
+                        {
+                            case SshMessage.Disconnect:
+                                ReadMsgDisconnect(msgReader);
+                                break;
+                            case SshMessage.Ignore:
+                                ReadMsgIgnore(msgReader);
+                                break;
+                            case SshMessage.Unimplemented:
+                                ReadMsgUnimplemented(msgReader);
+                                break;
+                            case SshMessage.Debug:
+                                ReadMsgDebug(msgReader);
+                                break;
+                            case SshMessage.ServiceRequest:
+                                ReadMsgServiceRequest(msgReader);
+                                break;
+                            case SshMessage.ServiceAccept:
+                                ReadMsgServiceAccept(msgReader);
+                                break;
+                            case SshMessage.KexInit:
+                                ReadMsgKexInit(msgReader);
+                                break;
+                            case SshMessage.NewKeys:
+                                ReadMsgNewKeys(msgReader);
+                                break;
+                            default:
+                                // Send Unimplemented message back to client.
+                                SendMsgUnimplemented();
+                                break;
+                        }
+                    }
+                    catch (EndOfStreamException)
+                    {
+                        // End of stream here means that the received message was found to be in an
+                        // unrecognisable format, so disconnect with an error message.
+                        Disconnect(SshDisconnectReason.ProtocolError, "Bad message format.");
                     }
                 }
             }
@@ -574,9 +583,10 @@ namespace WindowsSshServer
                 // Send kex initialization message.
                 SendMsgKexInit();
 
-                // Read packets from network stream.
+                // Read packets from network stream until connection is closed.
                 while (true)
                 {
+                    // Read next packet.
                     ReadPacket();
                 }
             }

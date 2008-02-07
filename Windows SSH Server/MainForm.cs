@@ -13,7 +13,7 @@ namespace WindowsSshServer
 {
     public partial class MainForm : Form
     {
-        protected SshServer _server;
+        internal SshServer _server;
 
         public MainForm()
         {

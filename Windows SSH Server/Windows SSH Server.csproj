@@ -56,6 +56,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Algorithms\SshZlibCompression.cs" />
+    <Compile Include="Algorithms\SshNoCompression.cs" />
+    <Compile Include="Algorithms\SshAes256Cbc.cs" />
     <Compile Include="Algorithms\SshAes128Cbc.cs" />
     <Compile Include="Algorithms\SshAes196Cbc.cs" />
     <Compile Include="Algorithms\SshHmacMd5_96.cs" />
@@ -68,6 +71,7 @@
     <Compile Include="Algorithms\SshDiffieHellmanGroup14Sha1.cs" />
     <Compile Include="Algorithms\SshDiffieHellmanGroup1Sha1.cs" />
     <Compile Include="CompressionAlgorithm.cs" />
+    <Compile Include="CryptoExtensions.cs" />
     <Compile Include="MacAlgorithm.cs" />
     <Compile Include="EncryptionAlgorithm.cs" />
     <Compile Include="PublicKeyAlgorithm.cs" />

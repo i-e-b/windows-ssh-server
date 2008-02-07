@@ -4,13 +4,12 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-using Org.Mentalis.Security.Cryptography;
-
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshHmacSha1_96 : MacAlgorithm
+    internal class SshHmacSha1_96 : SshHmacSha1
     {
         internal SshHmacSha1_96()
+            : base()
         {
         }
 
@@ -19,11 +18,12 @@ namespace WindowsSshServer.Algorithms
             get { return "hmac-sha1-96"; }
         }
 
-        public override HMAC CreateAlgorithm()
+        public override byte[] ComputeHash(byte[] input)
         {
-            var algorithm = new HMACSHA1();
+            var hash = base.ComputeHash(input);
+            Array.Resize(ref hash, 12); // 12 bytes = 96 bits
 
-            return algorithm;
+            return hash;
         }
     }
 }

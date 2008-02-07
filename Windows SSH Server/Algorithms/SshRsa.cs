@@ -4,14 +4,16 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-using Org.Mentalis.Security.Cryptography;
-
 namespace WindowsSshServer.Algorithms
 {
     internal class SshRsa : PublicKeyAlgorithm
     {
+        protected RSACryptoServiceProvider _algorithm; // Algorithm to use.
+
         internal SshRsa()
+            : base()
         {
+            _algorithm = new RSACryptoServiceProvider();
         }
 
         public override string Name
@@ -19,11 +21,9 @@ namespace WindowsSshServer.Algorithms
             get { return "ssh-rsa"; }
         }
 
-        public override AsymmetricAlgorithm CreateAlgorithm()
+        public override byte[] SignHash(byte[] hashData)
         {
-            var algorithm = new RSACryptoServiceProvider();
-
-            return algorithm;
+            throw new NotImplementedException();
         }
     }
 }

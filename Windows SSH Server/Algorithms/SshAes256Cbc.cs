@@ -6,19 +6,19 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshAes196Cbc : EncryptionAlgorithm
+    internal class SshAes256Cbc : EncryptionAlgorithm
     {
-        internal SshAes196Cbc()
+        internal SshAes256Cbc()
             : base()
         {
             _algorithm = new AesCryptoServiceProvider();
             _algorithm.Mode = CipherMode.CBC;
-            _algorithm.KeySize = 192;
+            _algorithm.KeySize = 256;
         }
 
         public override string Name
         {
-            get { return "aes196-cbc"; }
+            get { return "aes256-cbc"; }
         }
     }
 }

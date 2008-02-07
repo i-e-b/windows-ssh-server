@@ -6,24 +6,26 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshHmacMd5_96 : SshHmacMd5
+    internal class SshNoCompression : CompressionAlgorithm
     {
-        internal SshHmacMd5_96()
+        internal SshNoCompression()
             : base()
         {
         }
 
         public override string Name
         {
-            get { return "hmac-md5-96"; }
+            get { return "none"; }
         }
 
-        public override byte[] ComputeHash(byte[] input)
+        public override byte[] Compress(byte[] input)
         {
-            var hash = base.ComputeHash(input);
-            Array.Resize(ref hash, 12); // 12 bytes = 96 bits
+            return input;
+        }
 
-            return hash;
+        public override byte[] Decompress(byte[] input)
+        {
+            return input;
         }
     }
 }

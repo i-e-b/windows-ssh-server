@@ -4,28 +4,17 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-using WindowsSshServer.Algorithms;
-
 namespace WindowsSshServer
 {
     internal abstract class CompressionAlgorithm
     {
-        static CompressionAlgorithm()
-        {
-            CompressionAlgorithm.AllAlgorithms = new List<CompressionAlgorithm>();
-        }
-
-        public static List<CompressionAlgorithm> AllAlgorithms
-        {
-            get;
-            protected set;
-        }
-
         public abstract string Name
         {
             get;
         }
 
-        public abstract SymmetricAlgorithm CreateAlgorithm();
+        public abstract byte[] Compress(byte[] input);
+
+        public abstract byte[] Decompress(byte[] input);
     }
 }

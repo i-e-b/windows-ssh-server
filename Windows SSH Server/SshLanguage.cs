@@ -7,6 +7,17 @@ namespace WindowsSshServer
 {
     public class SshLanguage
     {
+        static SshLanguage()
+        {
+            SshLanguage.None = new SshLanguage("");
+        }
+
+        public static SshLanguage None
+        {
+            get;
+            protected set;
+        }
+
         public SshLanguage(string tag)
         {
             this.Tag = tag;

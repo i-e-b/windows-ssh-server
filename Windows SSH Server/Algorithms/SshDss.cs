@@ -4,14 +4,16 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-using Org.Mentalis.Security.Cryptography;
-
 namespace WindowsSshServer.Algorithms
 {
     internal class SshDss : PublicKeyAlgorithm
     {
+        protected DSACryptoServiceProvider _algorithm; // Algorithm to use.
+
         internal SshDss()
+            : base()
         {
+            _algorithm = new DSACryptoServiceProvider();
         }
 
         public override string Name
@@ -19,11 +21,9 @@ namespace WindowsSshServer.Algorithms
             get { return "ssh-dss"; }
         }
 
-        public override AsymmetricAlgorithm CreateAlgorithm()
+        public override byte[] SignHash(byte[] hashData)
         {
-            var algorithm = new DSACryptoServiceProvider();
-
-            return algorithm;
+            throw new NotImplementedException();
         }
     }
 }

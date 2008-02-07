@@ -4,23 +4,12 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-using WindowsSshServer.Algorithms;
-
 namespace WindowsSshServer
 {
     internal abstract class KexAlgorithm
     {
-        static KexAlgorithm()
+        internal KexAlgorithm()
         {
-            KexAlgorithm.AllAlgorithms = new List<KexAlgorithm>();
-            KexAlgorithm.AllAlgorithms.Add(new SshDiffieHellmanGroup1Sha1());
-            KexAlgorithm.AllAlgorithms.Add(new SshDiffieHellmanGroup14Sha1());
-        }
-
-        public static List<KexAlgorithm> AllAlgorithms
-        {
-            get;
-            protected set;
         }
 
         public abstract string Name
@@ -28,6 +17,8 @@ namespace WindowsSshServer
             get;
         }
 
-        public abstract AsymmetricAlgorithm CreateAlgorithm();
+        public abstract byte[] CreateKeyExchange();
+
+        public abstract byte[] DecryptKeyExchange(byte[] exchangeData);
     }
 }

@@ -7,7 +7,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    public sealed class SshServer : IDisposable
+    internal sealed class SshServer : IDisposable
     {
         private TcpListener _tcpListener; // Listens for TCP connections from clients.
         private List<SshClient> _clients; // List of connected clients.

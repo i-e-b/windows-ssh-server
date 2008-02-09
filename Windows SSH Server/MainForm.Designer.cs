@@ -34,6 +34,7 @@
             this.statusLabel = new System.Windows.Forms.Label();
             this.updateStatusTimer = new System.Windows.Forms.Timer(this.components);
             this.clientCountLabel = new System.Windows.Forms.Label();
+            this.generateKeysButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // startButton
@@ -63,7 +64,7 @@
             this.statusLabel.Location = new System.Drawing.Point(252, 9);
             this.statusLabel.Name = "statusLabel";
             this.statusLabel.Size = new System.Drawing.Size(200, 23);
-            this.statusLabel.TabIndex = 2;
+            this.statusLabel.TabIndex = 3;
             this.statusLabel.Text = "Status";
             this.statusLabel.TextAlign = System.Drawing.ContentAlignment.TopRight;
             // 
@@ -78,15 +79,26 @@
             this.clientCountLabel.Location = new System.Drawing.Point(252, 32);
             this.clientCountLabel.Name = "clientCountLabel";
             this.clientCountLabel.Size = new System.Drawing.Size(200, 13);
-            this.clientCountLabel.TabIndex = 3;
+            this.clientCountLabel.TabIndex = 4;
             this.clientCountLabel.Text = "Status";
             this.clientCountLabel.TextAlign = System.Drawing.ContentAlignment.TopRight;
+            // 
+            // generateKeysButton
+            // 
+            this.generateKeysButton.Location = new System.Drawing.Point(12, 70);
+            this.generateKeysButton.Name = "generateKeysButton";
+            this.generateKeysButton.Size = new System.Drawing.Size(150, 23);
+            this.generateKeysButton.TabIndex = 2;
+            this.generateKeysButton.Text = "Generate &Keys";
+            this.generateKeysButton.UseVisualStyleBackColor = true;
+            this.generateKeysButton.Click += new System.EventHandler(this.generateKeysButton_Click);
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(464, 444);
+            this.ClientSize = new System.Drawing.Size(464, 124);
+            this.Controls.Add(this.generateKeysButton);
             this.Controls.Add(this.clientCountLabel);
             this.Controls.Add(this.statusLabel);
             this.Controls.Add(this.stopButton);
@@ -106,6 +118,7 @@
         private System.Windows.Forms.Label statusLabel;
         private System.Windows.Forms.Timer updateStatusTimer;
         private System.Windows.Forms.Label clientCountLabel;
+        private System.Windows.Forms.Button generateKeysButton;
     }
 }
 

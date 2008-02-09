@@ -6,7 +6,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    internal abstract class EncryptionAlgorithm
+    public abstract class EncryptionAlgorithm
     {
         protected SymmetricAlgorithm _algorithm; // Algorithm to use.
 

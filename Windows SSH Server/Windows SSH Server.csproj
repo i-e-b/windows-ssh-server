@@ -98,6 +98,8 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <None Include="Keys\dss-default.key" />
+    <None Include="Keys\rsa-default.key" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -109,16 +111,18 @@
     </Compile>
     <Compile Include="SshClient.cs" />
     <Compile Include="SshLanguage.cs" />
-    <Compile Include="SshServer.cs" />
+    <Compile Include="SshTcpServer.cs" />
     <Compile Include="SshStreamReader.cs" />
     <Compile Include="SshStreamWriter.cs" />
+    <Compile Include="SshTcpClient.cs" />
     <Compile Include="Zlib.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConsoleHook.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Packets\SSH_MSG_KEXINIT_0.txt" />
+    <Content Include="Info\Public Key Formats.txt" />
+    <Content Include="Info\SSH_MSG_KEXINIT_0.txt" />
     <Content Include="zlib1.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

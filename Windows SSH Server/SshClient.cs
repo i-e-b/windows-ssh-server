@@ -12,22 +12,37 @@ using System.Threading;
 
 using WindowsSshServer.Algorithms;
 
+using Org.Mentalis.Security.Cryptography;
+
 namespace WindowsSshServer
 {
-    internal class SshClient : IDisposable
+    public class SshClient : IDisposable
     {
-        public EventHandler<EventArgs> Connected;
-        public EventHandler<DisconnectedEventArgs> Disconnected;
-        public EventHandler<EventArgs> Error;
+        public event EventHandler<EventArgs> Connected;
+        public event EventHandler<DisconnectedEventArgs> Disconnected;
+        public event EventHandler<EventArgs> Error;
+        public event EventHandler<EventArgs> DebugMessage;
 
         protected const string _protocolVersion = "2.0"; // Implemented version of SSH protocol.
 
         protected RNGCryptoServiceProvider _rng; // Random number generator.
+        protected KexAlgorithm _kexAlgorithm;    // Algorithm to use for kex (key exchange).
+        protected PublicKeyAlgorithm
+            _hostKeyAlgorithm;                   // Algorithm to use for host key.
+        protected EncryptionAlgorithm
+            _encryptionAlgorithm;                // Algorithm to use for encryption of payloads.
+        protected CompressionAlgorithm
+            _compressionAlgorithm;               // Algorithm to use for compression of payloads.
         protected MacAlgorithm _macAlgorithm;    // Algorithm to use for computing MAC (Message Authentication Code).
 
         protected uint _sendPacketSeqNumber;     // Sequence number of next packet to send.
         protected uint _receivePacketSeqNumber;  // Sequence number of next packet to be received.
-        protected string _sessionId;             // Session identifier, which is the first exchange hash.
+        protected string _serverIdString;        // ID string for server.
+        protected string _clientIdString;        // ID string for client.
+        protected byte[] _serverKexInitPayload;  // Payload of Kex Init message sent by server.
+        protected byte[] _clientKexInitPayload;  // Payload of Kex Init message sent by client.
+        protected byte[] _exchangeHash;          // Current exchange hash.
+        protected byte[] _sessionId;             // Session identifier, which is the first exchange hash.
 
         protected TcpClient _tcpClient;          // Client TCP connection.
         protected NetworkStream _networkStream;  // Stream for transmitting data across connection.
@@ -56,14 +71,13 @@ namespace WindowsSshServer
 
             // Create cryptographic objects.
             _rng = new RNGCryptoServiceProvider();
-            _macAlgorithm = null;
 
             // Initialize properties to default.
             this.ServerComments = null;
             this.Languages = null;
 
             this.KexAlgorithms = new List<KexAlgorithm>();
-            this.PublicKeyAlgorithms = new List<PublicKeyAlgorithm>();
+            this.HostKeyAlgorithms = new List<PublicKeyAlgorithm>();
             this.MacAlgorithms = new List<MacAlgorithm>();
             this.EncryptionAlgorithms = new List<EncryptionAlgorithm>();
             this.CompressionAlgorithms = new List<CompressionAlgorithm>();
@@ -77,6 +91,36 @@ namespace WindowsSshServer
         ~SshClient()
         {
             Dispose(false);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_isDisposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources.
+                    Disconnect();
+
+                    _kexAlgorithm = null;
+                    _hostKeyAlgorithm = null;
+                    _encryptionAlgorithm = null;
+                    _compressionAlgorithm = null;
+                    _macAlgorithm = null;
+
+                    GC.Collect();
+                }
+
+                // Dispose unmanaged resources.
+            }
+
+            _isDisposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         public string ClientProtocolVersion
@@ -103,7 +147,7 @@ namespace WindowsSshServer
             protected set;
         }
 
-        public List<PublicKeyAlgorithm> PublicKeyAlgorithms
+        public List<PublicKeyAlgorithm> HostKeyAlgorithms
         {
             get;
             protected set;
@@ -144,34 +188,35 @@ namespace WindowsSshServer
             get { return _tcpClient != null; }
         }
 
-        protected virtual void Dispose(bool disposing)
+        public void Connect()
         {
-            if (!_isDisposed)
-            {
-                if (disposing)
-                {
-                    // Dispose managed resources.
-                    Disconnect(false);
-                }
-
-                // Dispose unmanaged resources.
-            }
-
-            _isDisposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
+            //
         }
 
         public void Disconnect()
         {
+            Disconnect(SshDisconnectReason.ByApplication, null);
+        }
+
+        protected void Disconnect(SshDisconnectReason reason, string description)
+        {
+            Disconnect(reason, description, SshLanguage.None);
+        }
+
+        protected void Disconnect(SshDisconnectReason reason, string description, SshLanguage language)
+        {
+            try
+            {
+                // Send Disconnect message to client.
+                SendMsgDisconnect(reason, description, language);
+            }
+            catch { }
+
+            // Disconnect from client.
             Disconnect(false);
         }
 
-        public void Disconnect(bool remotely)
+        protected virtual void Disconnect(bool remotely)
         {
             if (_tcpClient == null) return;
 
@@ -189,28 +234,14 @@ namespace WindowsSshServer
             OnDisconnected(remotely);
         }
 
-        protected void Disconnect(SshDisconnectReason reason, string description)
-        {
-            Disconnect(reason, description, SshLanguage.None);
-        }
-
-        protected void Disconnect(SshDisconnectReason reason, string description, SshLanguage language)
-        {
-            // Send Disconnect message to client.
-            SendMsgDisconnect(reason, description, language);
-
-            // Disconnect from client.
-            Disconnect(false);
-        }
-
-        protected void AddDefaultAlgorithms()
+        protected virtual void AddDefaultAlgorithms()
         {
             // Add default algorithms to lists for this client.
             this.KexAlgorithms.Add(new SshDiffieHellmanGroup1Sha1());
             this.KexAlgorithms.Add(new SshDiffieHellmanGroup14Sha1());
 
-            this.PublicKeyAlgorithms.Add(new SshDss());
-            this.PublicKeyAlgorithms.Add(new SshRsa());
+            this.HostKeyAlgorithms.Add(new SshDss());
+            this.HostKeyAlgorithms.Add(new SshRsa());
 
             this.EncryptionAlgorithms.Add(new SshAes256Cbc());
             this.EncryptionAlgorithms.Add(new SshAes196Cbc());
@@ -226,6 +257,49 @@ namespace WindowsSshServer
             this.CompressionAlgorithms.Add(new SshNoCompression());
         }
 
+        protected void SendMsgKexDhReply(byte[] clientExchangeValue)
+        {
+            // Create server kex value.
+            byte[] serverExchangeValue = _kexAlgorithm.CreateKeyExchange();
+
+            // Decrypt shared secret from kex value.
+            byte[] sharedSecret = _kexAlgorithm.DecryptKeyExchange(clientExchangeValue);
+
+            // Get public host key and certificates.
+            byte[] hostKey = _hostKeyAlgorithm.CreateKeyData();
+            
+            // Compute exchange hash.
+            _exchangeHash = ComputeExchangeHash(hostKey, clientExchangeValue, serverExchangeValue,
+                sharedSecret);
+
+            // Set session identifier if it has not already been set.
+            if (_sessionId == null) _sessionId = _exchangeHash;
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                using (var msgWriter = new SshStreamWriter(msgStream))
+                {
+                    // Write message ID.
+                    msgWriter.Write((byte)SshMessageKexDiffieHellman.Reply);
+
+                    // Send server public host key and certificates.
+                    msgWriter.WriteByteString(hostKey);
+
+                    // Write server kex value.
+                    msgWriter.WriteMPint(serverExchangeValue);
+                    
+                    // Write signature of exchange hash.
+                    var signatureData = _hostKeyAlgorithm.CreateSignatureData(_exchangeHash);
+
+                    msgWriter.WriteByteString(signatureData);
+                }
+
+                // Send Kex Diffie-Hellman Init message.
+                SendPacket(msgStream.GetBuffer());
+            }
+        }
+
         protected void SendMsgDisconnect(SshDisconnectReason reason, string description,
             SshLanguage language)
         {
@@ -234,6 +308,9 @@ namespace WindowsSshServer
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
+                    // Write message ID.
+                    msgWriter.Write((byte)SshMessage.Disconnect);
+
                     // Write reason code.
                     msgWriter.Write((uint)reason);
 
@@ -257,7 +334,7 @@ namespace WindowsSshServer
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
                     // Write message ID.
-                    msgWriter.Write(SshMessage.Unimplemented);
+                    msgWriter.Write((byte)SshMessage.Unimplemented);
 
                     // Send sequence number of unrecognised packet.
                     msgWriter.Write(_receivePacketSeqNumber);
@@ -276,7 +353,7 @@ namespace WindowsSshServer
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
                     // Write message ID.
-                    msgWriter.Write(SshMessage.KexInit);
+                    msgWriter.Write((byte)SshMessage.KexInit);
 
                     // Write random cookie.
                     byte[] cookie = new byte[16];
@@ -285,26 +362,29 @@ namespace WindowsSshServer
                     msgWriter.Write(cookie);
 
                     // Write list of kex algorithms.
-                    msgWriter.Write((from alg in this.KexAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.KexAlgorithms select alg.Name).ToArray());
 
                     // Write list of server host key algorithms.
-                    msgWriter.Write((from alg in this.PublicKeyAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.HostKeyAlgorithms select alg.Name).ToArray());
 
                     // Write lists of encryption algorithms.
-                    msgWriter.Write((from alg in this.EncryptionAlgorithms select alg.Name).ToArray());
-                    msgWriter.Write((from alg in this.EncryptionAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.EncryptionAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.EncryptionAlgorithms select alg.Name).ToArray());
 
                     // Write lists of MAC algorithms.
-                    msgWriter.Write((from alg in this.MacAlgorithms select alg.Name).ToArray());
-                    msgWriter.Write((from alg in this.MacAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.MacAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.MacAlgorithms select alg.Name).ToArray());
 
                     // Write lists of compression algorithms.
-                    msgWriter.Write((from alg in this.CompressionAlgorithms select alg.Name).ToArray());
-                    msgWriter.Write((from alg in this.CompressionAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.CompressionAlgorithms select alg.Name).ToArray());
+                    msgWriter.WriteNameList((from alg in this.CompressionAlgorithms select alg.Name).ToArray());
 
                     // Write lists of languages.
-                    msgWriter.Write(this.Languages == null ? new string[0] :
-                        (from lang in this.Languages select lang.Tag).ToArray());
+                    string[] langTags = this.Languages == null ? new string[0]
+                        : (from lang in this.Languages select lang.Tag).ToArray();
+
+                    msgWriter.WriteNameList(langTags);
+                    msgWriter.WriteNameList(langTags);
 
                     // Write whether first (guessed) kex packet follows.
                     msgWriter.Write(false);
@@ -314,7 +394,8 @@ namespace WindowsSshServer
                 }
 
                 // Send Kex Initialization message.
-                SendPacket(msgStream.GetBuffer());
+                _serverKexInitPayload = msgStream.GetBuffer();
+                SendPacket(_serverKexInitPayload);
             }
         }
 
@@ -365,6 +446,15 @@ namespace WindowsSshServer
             //
         }
 
+        protected void ReadMsgDhKexInit(SshStreamReader msgReader)
+        {
+            // Read client exchange value.
+            byte[] clientExchangeValue = msgReader.ReadMPInt();
+
+            // Send reply message.
+            SendMsgKexDhReply(clientExchangeValue);
+        }
+
         protected void ReadMsgKexInit(SshStreamReader msgReader)
         {
             // Read random cookie.
@@ -384,13 +474,94 @@ namespace WindowsSshServer
             bool firstKexPacketFollows = msgReader.ReadBoolean();
             uint reserved0 = msgReader.ReadUInt32();
 
-            //
+            // Pick kex algorithm to use (see RFC4253 section 7.1).
+            KexAlgorithm kexAlg = null;
+
+            foreach (var kexAlgName in kexAlgorithms)
+            {
+                // Try to find supported algorithm with current name.
+                kexAlg = this.KexAlgorithms.SingleOrDefault(item => kexAlgName == item.Name);
+
+                if (kexAlg != null)
+                {
+                    // Set kex algorithm to use.
+                    _kexAlgorithm = kexAlg;
+                }
+            }
+
+            // Check that kex algorithm was found.
+            if (_kexAlgorithm == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the key exchange algorithms listed are supported.");
+            }
+
+            // Pick server host key algorithm to use (see RFC4253 section 7.1).
+            PublicKeyAlgorithm hostKeyAlg = null;
+
+            foreach (var hostKeyAlgName in serverHostKeyAlgorithms)
+            {
+                // Try to find supported algorithm with current name.
+                hostKeyAlg = this.HostKeyAlgorithms.SingleOrDefault(item => hostKeyAlgName == item.Name);
+
+                if (hostKeyAlg != null)
+                {
+                    // Set host key algorithm to use.
+                    _hostKeyAlgorithm = hostKeyAlg;
+                }
+            }
+
+            // Check that host key algorithm was found.
+            if (_hostKeyAlgorithm == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the server host key algorithms listed are supported.");
+            }
+
+            // Load key for host algorithm.
+            if (_hostKeyAlgorithm is SshDss)
+            {
+                SshDss hostKeyAlgDss = (SshDss)_hostKeyAlgorithm;
+
+                hostKeyAlg.ImportKey(@"../../Keys/dss-default.key");
+            }
+            else if (_hostKeyAlgorithm is SshRsa)
+            {
+                SshRsa hostKeyAlgRsa = (SshRsa)_hostKeyAlgorithm;
+
+                hostKeyAlg.ImportKey(@"../../Keys/rsa-default.key");
+            }
         }
 
         protected void ReadMsgNewKeys(SshStreamReader msgReader)
         {
             // Start using new keys and algorithms.
             //
+        }
+
+        public void SendLine(string value)
+        {
+            // Write chars of line to stream.
+            byte[] buffer = Encoding.ASCII.GetBytes(value + "\r\n");
+
+            _streamWriter.Write(buffer);
+        }
+
+        public string ReadLine()
+        {
+            var lineBuilder = new StringBuilder();
+
+            // Read chars from stream until LF (line feed) is found.
+            char curChar;
+
+            do
+            {
+                curChar = _streamReader.ReadChar();
+                lineBuilder.Append(curChar);
+            } while (curChar != '\n');
+
+            // Return line without trailing CR LF.
+            return lineBuilder.ToString(0, lineBuilder.Length - 2);
         }
 
         protected void SendPacket(byte[] payload)
@@ -429,6 +600,11 @@ namespace WindowsSshServer
             // Write packet data to network stream.
             _streamWriter.Write(packetData);
 
+            // Write to debug.
+            SshMessage messageId = (SshMessage)(payload[0]);
+
+            Debug.WriteLine(string.Format("<<< {0}", messageId.ToString()));
+
             // Write MAC (Message Authentication Code), if MAC algorithm has been agreed on.
             if (_macAlgorithm != null) _streamWriter.Write(ComputeMac(packetData));
 
@@ -456,9 +632,14 @@ namespace WindowsSshServer
             if (mac.Length > 0) _streamReader.Read(mac, 0, mac.Length);
 
             // Decompress and decode payload data.
-            byte[] payload = rawPayload;
+            byte[] payload;
 
-            // Verify MAC.
+            if (_encryptionAlgorithm == null)
+                payload = rawPayload;
+            else
+                payload = _encryptionAlgorithm.Decrypt(rawPayload);
+
+            // Verify MAC of received packet.
             //
 
             // Read received message.
@@ -468,33 +649,47 @@ namespace WindowsSshServer
                 {
                     try
                     {
+                        byte messageId = msgReader.ReadByte();
+
+                        // Write to debug.
+                        Debug.WriteLine(string.Format(">>> {0}", messageId.ToString()));
+
                         // Check message ID.
-                        switch (msgReader.ReadMessageId())
+                        switch (messageId)
                         {
-                            case SshMessage.Disconnect:
+                            // Standard messages
+                            case (byte)SshMessage.Disconnect:
                                 ReadMsgDisconnect(msgReader);
                                 break;
-                            case SshMessage.Ignore:
+                            case (byte)SshMessage.Ignore:
                                 ReadMsgIgnore(msgReader);
                                 break;
-                            case SshMessage.Unimplemented:
+                            case (byte)SshMessage.Unimplemented:
                                 ReadMsgUnimplemented(msgReader);
                                 break;
-                            case SshMessage.Debug:
+                            case (byte)SshMessage.Debug:
                                 ReadMsgDebug(msgReader);
                                 break;
-                            case SshMessage.ServiceRequest:
+                            case (byte)SshMessage.ServiceRequest:
                                 ReadMsgServiceRequest(msgReader);
                                 break;
-                            case SshMessage.ServiceAccept:
+                            case (byte)SshMessage.ServiceAccept:
                                 ReadMsgServiceAccept(msgReader);
                                 break;
-                            case SshMessage.KexInit:
+                            case (byte)SshMessage.KexInit:
+                                // Store payload of message.
+                                _clientKexInitPayload = payload;
+
                                 ReadMsgKexInit(msgReader);
                                 break;
-                            case SshMessage.NewKeys:
+                            case (byte)SshMessage.NewKeys:
                                 ReadMsgNewKeys(msgReader);
                                 break;
+                            // Diffie-Hellman kex messages
+                            case (byte)SshMessageKexDiffieHellman.Init:
+                                ReadMsgDhKexInit(msgReader);
+                                break;
+                            // Unrecognised message
                             default:
                                 // Send Unimplemented message back to client.
                                 SendMsgUnimplemented();
@@ -503,15 +698,43 @@ namespace WindowsSshServer
                     }
                     catch (EndOfStreamException)
                     {
-                        // End of stream here means that the received message was found to be in an
-                        // unrecognisable format, so disconnect with an error message.
+                        // End of stream here means that the received message was found to be malformed.
                         Disconnect(SshDisconnectReason.ProtocolError, "Bad message format.");
+                    }
+                    catch (Exception ex)
+                    {
+                        // Fatal error has occurred.
+                        Disconnect(SshDisconnectReason.ProtocolError, string.Format("Fatal error: {0}",
+                            ex.Message));
                     }
                 }
             }
 
             // Increment sequence number of next packet to be received.
             unchecked { _receivePacketSeqNumber++; }
+        }
+
+        protected byte[] ComputeExchangeHash(byte[] hostKey, byte[] clientExchangeValue,
+            byte[] serverExchangeValue, byte[] sharedSecret)
+        {
+            using (var hashInputStream = new MemoryStream())
+            {
+                using (var hashInputWriter = new SshStreamWriter(hashInputStream))
+                {
+                    // Write input data to hash stream.
+                    hashInputWriter.Write(_clientIdString);
+                    hashInputWriter.Write(_serverIdString);
+                    hashInputWriter.Write(_clientKexInitPayload);
+                    hashInputWriter.Write(_serverKexInitPayload);
+                    hashInputWriter.WriteByteString(hostKey);
+                    hashInputWriter.Write(clientExchangeValue);
+                    hashInputWriter.Write(serverExchangeValue);
+                    hashInputWriter.Write(sharedSecret);
+                }
+
+                // Return hash of input data.
+                return _kexAlgorithm.ComputeHash(hashInputStream.GetBuffer());
+            }
         }
 
         protected byte[] ComputeMac(byte[] unencryptedPacket)
@@ -529,7 +752,7 @@ namespace WindowsSshServer
             return _macAlgorithm.ComputeHash(inputData);
         }
 
-        protected void OnConnected()
+        protected virtual void OnConnected()
         {
             // Create network objects.
             _networkStream = _tcpClient.GetStream();
@@ -538,7 +761,15 @@ namespace WindowsSshServer
 
             _sendPacketSeqNumber = 0;
             _receivePacketSeqNumber = 0;
+            _serverIdString = null;
+            _clientIdString = null;
             _sessionId = null;
+
+            _kexAlgorithm = null;
+            _hostKeyAlgorithm = null;
+            _encryptionAlgorithm = null;
+            _compressionAlgorithm = null;
+            _macAlgorithm = null;
 
             // Create thread on which to receive data from connection.
             _receiveThread = new Thread(new ThreadStart(ReceiveData));
@@ -548,7 +779,7 @@ namespace WindowsSshServer
             if (Connected != null) Connected(this, new EventArgs());
         }
 
-        protected void OnDisconnected(bool disconnectedRemotely)
+        protected virtual void OnDisconnected(bool disconnectedRemotely)
         {
             // Raise event: client has disconnected.
             if (Disconnected != null) Disconnected(this, new DisconnectedEventArgs(disconnectedRemotely));
@@ -558,14 +789,16 @@ namespace WindowsSshServer
         {
             try
             {
-                // Send server identification string.
-                _streamWriter.WriteLine(string.Format("SSH-{0}-{1}", _protocolVersion,
-                    SshClient.SoftwareVersion) + (this.ServerComments == null ? "" :
-                    " " + this.ServerComments));
+                // Create and send server identification string.
+                _serverIdString = string.Format("SSH-{0}-{1}", _protocolVersion,
+                    SshClient.SoftwareVersion) + (this.ServerComments == null ? "" : " "
+                    + this.ServerComments);
+
+                SendLine(_serverIdString);
 
                 // Read identification string of client.
-                var clientId = _streamReader.ReadLine();
-                var clientIdParts = clientId.Split(' ');
+                _clientIdString = ReadLine();
+                var clientIdParts = _clientIdString.Split(' ');
                 var clientIdVersions = clientIdParts[0].Split('-');
 
                 this.ClientProtocolVersion = clientIdVersions[1];
@@ -595,9 +828,10 @@ namespace WindowsSshServer
                 // Client disconnected.
                 Disconnect(true);
             }
-            catch (IOException ex)
+            catch (IOException)
             {
-                throw new Exception("CHECK WHAT THIS ERROR MEANS EXACTLY.", ex);
+                // Error with network connection.
+                Disconnect(false);
             }
             catch (ThreadAbortException)
             {
@@ -622,18 +856,6 @@ namespace WindowsSshServer
         }
     }
 
-    public enum SshMessage : byte
-    {
-        Disconnect = 1,
-        Ignore = 2,
-        Unimplemented = 3,
-        Debug = 4,
-        ServiceRequest = 5,
-        ServiceAccept = 6,
-        KexInit = 20,
-        NewKeys = 21
-    }
-
     public enum SshDisconnectReason : uint
     {
         HostNotAllowedToConnect = 1,
@@ -651,5 +873,23 @@ namespace WindowsSshServer
         AuthCancelledByUser = 13,
         NoMoreAuthMethodsAvailable = 14,
         IllegalUserName = 15
+    }
+
+    public enum SshMessage : byte
+    {
+        Disconnect = 1,
+        Ignore = 2,
+        Unimplemented = 3,
+        Debug = 4,
+        ServiceRequest = 5,
+        ServiceAccept = 6,
+        KexInit = 20,
+        NewKeys = 21
+    }
+
+    public enum SshMessageKexDiffieHellman : byte
+    {
+        Init = 30,
+        Reply = 31
     }
 }

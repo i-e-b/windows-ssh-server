@@ -6,7 +6,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    internal abstract class MacAlgorithm
+    public abstract class MacAlgorithm
     {
         protected HMAC _algorithm; // Algorithm to use.
 

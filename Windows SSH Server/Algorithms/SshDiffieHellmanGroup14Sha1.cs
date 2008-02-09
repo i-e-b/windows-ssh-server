@@ -10,12 +10,13 @@ namespace WindowsSshServer.Algorithms
 {
     internal class SshDiffieHellmanGroup14Sha1 : KexAlgorithm
     {
-        protected DiffieHellman _algorithm; // Algorithm to use.
+        protected DiffieHellman _exchangeAlgorithm; // Exchange algorithm to use.
 
         internal SshDiffieHellmanGroup14Sha1()
             : base()
         {
-            _algorithm = new DiffieHellmanManaged(2048, 0, DHKeyGeneration.Static);
+            _exchangeAlgorithm = new DiffieHellmanManaged(2048, 0, DHKeyGeneration.Static);
+            _hashAlgorithm = new SHA1CryptoServiceProvider();
         }
 
         public override string Name
@@ -23,14 +24,19 @@ namespace WindowsSshServer.Algorithms
             get { return "diffie-hellman-group14-sha1"; }
         }
 
+        public override AsymmetricAlgorithm ExchangeAlgorithm
+        {
+            get { return _exchangeAlgorithm; }
+        }
+
         public override byte[] CreateKeyExchange()
         {
-            return _algorithm.CreateKeyExchange();
+            return _exchangeAlgorithm.CreateKeyExchange();
         }
 
         public override byte[] DecryptKeyExchange(byte[] exchangeData)
         {
-            return _algorithm.DecryptKeyExchange(exchangeData);
+            return _exchangeAlgorithm.DecryptKeyExchange(exchangeData);
         }
     }
 }

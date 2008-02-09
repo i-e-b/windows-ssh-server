@@ -6,7 +6,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    internal abstract class CompressionAlgorithm
+    public abstract class CompressionAlgorithm
     {
         public abstract string Name
         {

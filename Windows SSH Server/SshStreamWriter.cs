@@ -37,29 +37,79 @@ namespace WindowsSshServer
             get { return _stream; }
         }
 
-        public void WriteLine(string value)
-        {
-            // Write chars of line to stream.
-            byte[] buffer = Encoding.ASCII.GetBytes(value + "\r\n");
-
-            _stream.Write(buffer, 0, buffer.Length);
-        }
-
-        public void Write(SshMessage messageId)
-        {
-            Write((byte)messageId);
-        }
-
-        public void Write(string[] nameList)
+        public void WriteNameList(string[] nameList)
         {
             Write(string.Join(",", nameList));
+        }
+
+        //public void WriteMPint(int value)
+        //{
+        //    var strBuilder = new StringBuilder();
+
+        //    // Write bytes of integer (as many as are needed).
+        //    byte curByte = 0;
+        //    byte lastByte;
+
+        //    while (true)
+        //    {
+        //        lastByte = curByte;
+        //        curByte = (byte)(value & 0xFF);
+        //        if (curByte == 0) break;
+
+        //        strBuilder.Insert(0, curByte);
+        //        value >>= 1;
+        //    }
+
+        //    // Insert null byte if MSB of integer is high.
+        //    if ((lastByte & 0x80) != 0) strBuilder.Insert(0, (byte)0);
+
+        //    // Prepend length of string.
+        //    strBuilder.Append(strBuilder.Length);
+
+        //    Write(strBuilder.ToString());
+        //}
+
+        public void WriteByteString(byte[] value)
+        {
+            Write((uint)value.Length);
+            Write(value);
+        }
+
+        public void WriteMPint(int value)
+        {
+            // Get array of bytes for specified integer value.
+            byte[] rawNum = BitConverter.GetBytes(value);
+            uint leadingZerosCount = 0;
+
+            while (rawNum[leadingZerosCount] == 0) leadingZerosCount++;
+
+            // Strip leading zeros from byte array.
+            byte[] num = new byte[rawNum.Length - leadingZerosCount];
+
+            Array.Copy(rawNum, leadingZerosCount, num, 0, num.Length);
+
+            WriteMPint(num);
+        }
+
+        public void WriteMPint(byte[] value)
+        {
+            uint strLength = (uint)value.Length;
+            
+            //// Insert null byte if MSB of integer is high.
+            //bool addLeadingZero = ((value[0] & 0x80) != 0);
+            //if (addLeadingZero) strLength++;
+
+            Write(strLength);
+            //if (addLeadingZero) Write((byte)0);
+            Write(value);
         }
 
         public void Write(string value)
         {
             byte[] buffer = Encoding.ASCII.GetBytes(value);
 
-            _stream.Write(buffer, 0, buffer.Length);
+            Write((uint)buffer.Length);
+            Write(buffer);
         }
 
         public void Write(char value)

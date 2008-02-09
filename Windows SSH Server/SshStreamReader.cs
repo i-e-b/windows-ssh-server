@@ -37,43 +37,41 @@ namespace WindowsSshServer
             get { return _stream; }
         }
 
-        public string ReadLine()
-        {
-            var lineBuilder = new StringBuilder();
-
-            // Read chars from stream until LF (line feed) is found.
-            char curChar;
-
-            do
-            {
-                curChar = ReadChar();
-                lineBuilder.Append(curChar);
-            } while (curChar != '\n');
-
-            // Return line without trailing CR LF.
-            return lineBuilder.ToString(0, lineBuilder.Length - 2);
-        }
-
-        public SshMessage ReadMessageId()
-        {
-            return (SshMessage)ReadByte();
-        }
-
         public string[] ReadNameList()
         {
             return ReadString().Split(new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        public byte[] ReadByteString()
+        {
+            var strLength = ReadUInt32();
+            return ReadBytes(strLength);
+        }
+
+        //public int ReadMPInt()
+        //{
+        //    uint strLength = ReadUInt32();
+        //    byte[] value = ReadBytes(strLength);
+
+        //    return BitConverter.ToInt32(value, 0);
+        //}
+
+        public byte[] ReadMPInt()
+        {
+            var strLength = ReadUInt32();
+            return ReadBytes(strLength);
         }
 
         public string ReadString()
         {
             // Read string of known length from stream.
             uint length = ReadUInt32();
-            byte[] buffer = new byte[length];
+            //byte[] buffer = new byte[length];
 
-            int bytesRead = _stream.Read(buffer, 0, buffer.Length);
-            if (bytesRead == 0 && buffer.Length > 0) throw new EndOfStreamException();
+            //int bytesRead = _stream.Read(buffer, 0, buffer.Length);
+            //if (bytesRead == 0 && buffer.Length > 0) throw new EndOfStreamException();
 
-            return Encoding.ASCII.GetString(buffer, 0, bytesRead);
+            return Encoding.ASCII.GetString(ReadBytes(length));
         }
 
         public char ReadChar()
@@ -108,7 +106,7 @@ namespace WindowsSshServer
             return (num != 0);
         }
 
-        public byte[] ReadBytes(int count)
+        public byte[] ReadBytes(uint count)
         {
             byte[] buffer = new byte[count];
 

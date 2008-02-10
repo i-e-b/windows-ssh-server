@@ -56,7 +56,7 @@ namespace WindowsSshServer
             var rsaAlg = new Algorithms.SshRsa();
 
             dssAlg.ExportKey(keysDir + @"dss-default.key");
-            dssAlg.ExportKey(keysDir + @"rsa-default.key");
+            rsaAlg.ExportKey(keysDir + @"rsa-default.key");
         }
 
         private void updateStatusTimer_Tick(object sender, EventArgs e)

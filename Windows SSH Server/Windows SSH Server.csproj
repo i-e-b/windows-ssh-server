@@ -70,6 +70,7 @@
     <Compile Include="Algorithms\SshDss.cs" />
     <Compile Include="Algorithms\SshDiffieHellmanGroup14Sha1.cs" />
     <Compile Include="Algorithms\SshDiffieHellmanGroup1Sha1.cs" />
+    <Compile Include="BasicExtensions.cs" />
     <Compile Include="CompressionAlgorithm.cs" />
     <Compile Include="CryptoExtensions.cs" />
     <Compile Include="MacAlgorithm.cs" />

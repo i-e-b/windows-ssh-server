@@ -10,8 +10,37 @@ namespace WindowsSshServer
     {
         protected HashAlgorithm _hashAlgorithm; // Algorithm to use for hashing.
 
-        internal KexAlgorithm()
+        private bool _isDisposed = false;       // True if object has been disposed.
+
+        public KexAlgorithm()
         {
+        }
+
+        ~KexAlgorithm()
+        {
+            Dispose(false);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_isDisposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources.
+                    if (_hashAlgorithm != null) _hashAlgorithm.Clear();
+                }
+
+                // Dispose unmanaged resources.
+            }
+
+            _isDisposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         public abstract string Name

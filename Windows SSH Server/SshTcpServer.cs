@@ -93,8 +93,6 @@ namespace WindowsSshServer
                     // Stop TCP listener.
                     _tcpListener.Stop();
                     _tcpListener = null;
-
-                    GC.Collect();
                 }
             }
         }
@@ -135,6 +133,7 @@ namespace WindowsSshServer
 
                 sshClient.Connected += client_Connected;
                 sshClient.Disconnected += client_Disconnected;
+                sshClient.ConnectionEstablished();
 
                 _clients.Add(sshClient);
             }

@@ -7,11 +7,51 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    public abstract class PublicKeyAlgorithm
+    public abstract class PublicKeyAlgorithm : IDisposable
     {
+        protected AsymmetricAlgorithm _algorithm; // Algorithm to use.
+
+        private bool _isDisposed = false;         // True if object has been disposed.
+
+        public PublicKeyAlgorithm()
+        {
+        }
+
+        ~PublicKeyAlgorithm()
+        {
+            Dispose(false);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_isDisposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources.
+                    if (_algorithm != null) _algorithm.Clear();
+                }
+
+                // Dispose unmanaged resources.
+            }
+
+            _isDisposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         public abstract string Name
         {
             get;
+        }
+
+        public AsymmetricAlgorithm Algorithm
+        {
+            get { return _algorithm; }
         }
 
         public void ImportKey(string fileName)
@@ -52,7 +92,7 @@ namespace WindowsSshServer
                     dataWriter.WriteByteString(signature);
                 }
 
-                return dataStream.GetBuffer();
+                return dataStream.ToArray();
             }
         }
 

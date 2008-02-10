@@ -9,7 +9,7 @@ namespace WindowsSshServer.Algorithms
 {
     internal class SshDss : PublicKeyAlgorithm
     {
-        protected DSACryptoServiceProvider _algorithm; // Algorithm to use.
+        protected new DSACryptoServiceProvider _algorithm; // Algorithm to use.
 
         internal SshDss()
             : base()
@@ -17,7 +17,7 @@ namespace WindowsSshServer.Algorithms
             _algorithm = new DSACryptoServiceProvider();
         }
 
-        public DSACryptoServiceProvider Algorithm
+        public new DSACryptoServiceProvider Algorithm
         {
             get { return _algorithm; }
         }
@@ -55,14 +55,14 @@ namespace WindowsSshServer.Algorithms
                     var algParams = _algorithm.ExportParameters(true);
 
                     // Write data to stream.
-                    dataWriter.Write("ssh-dss");
+                    dataWriter.Write(this.Name);
                     dataWriter.WriteMPint(algParams.P);
                     dataWriter.WriteMPint(algParams.Q);
                     dataWriter.WriteMPint(algParams.G);
                     dataWriter.WriteMPint(algParams.Y);
                 }
 
-                return dataStream.GetBuffer();
+                return dataStream.ToArray();
             }
         }
 
@@ -70,7 +70,10 @@ namespace WindowsSshServer.Algorithms
         {
             var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
 
-            return _algorithm.SignHash(hashData, hashAlgOid);
+            using (var sha1 = new SHA1CryptoServiceProvider())
+            {
+                return _algorithm.SignHash(sha1.ComputeHash(hashData), hashAlgOid);
+            }
         }
     }
 }

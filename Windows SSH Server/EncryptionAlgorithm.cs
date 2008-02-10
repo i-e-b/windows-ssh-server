@@ -10,8 +10,37 @@ namespace WindowsSshServer
     {
         protected SymmetricAlgorithm _algorithm; // Algorithm to use.
 
-        internal EncryptionAlgorithm()
+        private bool _isDisposed = false;        // True if object has been disposed.
+
+        public EncryptionAlgorithm()
         {
+        }
+
+        ~EncryptionAlgorithm()
+        {
+            Dispose(false);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_isDisposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources.
+                    if (_algorithm != null) _algorithm.Clear();
+                }
+
+                // Dispose unmanaged resources.
+            }
+
+            _isDisposed = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         public abstract string Name

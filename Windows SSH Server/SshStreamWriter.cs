@@ -95,12 +95,12 @@ namespace WindowsSshServer
         {
             uint strLength = (uint)value.Length;
             
-            //// Insert null byte if MSB of integer is high.
-            //bool addLeadingZero = ((value[0] & 0x80) != 0);
-            //if (addLeadingZero) strLength++;
+            // Insert null byte if MSB of integer is high.
+            bool addLeadingZero = ((value[0] & 0x80) != 0);
+            if (addLeadingZero) strLength++;
 
             Write(strLength);
-            //if (addLeadingZero) Write((byte)0);
+            if (addLeadingZero) Write((byte)0);
             Write(value);
         }
 

@@ -35,10 +35,6 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\DiffieHellman.dll</HintPath>
     </Reference>
-    <Reference Include="DotZLib, Version=1.0.2957.38180, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\DotZLib.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -72,7 +68,10 @@
     <Compile Include="Algorithms\SshDiffieHellmanGroup1Sha1.cs" />
     <Compile Include="BasicExtensions.cs" />
     <Compile Include="CompressionAlgorithm.cs" />
+    <Compile Include="CachedStream.cs" />
     <Compile Include="IConnection.cs" />
+    <Compile Include="SshAuthentication.cs" />
+    <Compile Include="SshConnection.cs" />
     <Compile Include="SshException.cs" />
     <Compile Include="CryptoExtensions.cs" />
     <Compile Include="MacAlgorithm.cs" />
@@ -112,14 +111,13 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="SshClient.cs" />
+    <Compile Include="SshTransport.cs" />
     <Compile Include="SshDisconnectedException.cs" />
     <Compile Include="SshTcpServer.cs" />
     <Compile Include="SshStreamReader.cs" />
     <Compile Include="SshStreamWriter.cs" />
     <Compile Include="SshConsoleClient.cs" />
     <Compile Include="TcpConnection.cs" />
-    <Compile Include="Zlib.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConsoleHook.dll">

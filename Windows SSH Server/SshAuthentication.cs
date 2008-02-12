@@ -1,33 +1,31 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 using System.Text;
 
 namespace WindowsSshServer
 {
-    public class SshConsoleClient : SshConnection
+    public class SshAuthentication : SshTransport
     {
         private bool _isDisposed = false; // True if object has been disposed.
 
-        public SshConsoleClient(IConnection connection)
+        public SshAuthentication(IConnection connection)
             : base(connection)
         {
         }
 
-        public SshConsoleClient(Stream stream)
+        public SshAuthentication(Stream stream)
             : base(stream)
         {
         }
 
-        public SshConsoleClient(IConnection connection, bool addDefaultAlgorithms)
+        public SshAuthentication(IConnection connection, bool addDefaultAlgorithms)
             : base(connection, addDefaultAlgorithms)
         {
         }
 
-        public SshConsoleClient(Stream stream, bool addDefaultAlgorithms)
+        public SshAuthentication(Stream stream, bool addDefaultAlgorithms)
             : base(stream, addDefaultAlgorithms)
         {
         }
@@ -53,5 +51,7 @@ namespace WindowsSshServer
                 base.Dispose(disposing);
             }
         }
+
+        //
     }
 }

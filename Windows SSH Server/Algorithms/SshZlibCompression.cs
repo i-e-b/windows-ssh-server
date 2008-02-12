@@ -20,12 +20,12 @@ namespace WindowsSshServer.Algorithms
 
         public override byte[] Compress(byte[] input)
         {
-            return input;
+            throw new NotImplementedException();
         }
 
         public override byte[] Decompress(byte[] input)
         {
-            return input;
+            throw new NotImplementedException();
         }
 
         public override object Clone()

@@ -8,7 +8,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    public class SshConsoleClient : SshConnection
+    public class SshConsoleClient : SshClient
     {
         private bool _isDisposed = false; // True if object has been disposed.
 

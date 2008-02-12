@@ -16,8 +16,21 @@ using Org.Mentalis.Security.Cryptography;
 
 namespace WindowsSshServer
 {
-    public class SshTransport : IDisposable
+    public class SshClient : IDisposable
     {
+        static SshClient()
+        {
+            // Set default software version.
+            SshClient.SoftwareVersion = "WindowsSshServer_"
+                + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+        }
+
+        public static string SoftwareVersion
+        {
+            get;
+            set;
+        }
+
         public event EventHandler<EventArgs> Connected;
         public event EventHandler<SshDisconnectedEventArgs> Disconnected;
         public event EventHandler<EventArgs> Error;
@@ -26,6 +39,9 @@ namespace WindowsSshServer
         protected const uint _maxPacketLength = 35000;   // Maximum total length of packet.
 
         protected const string _protocolVersion = "2.0"; // Implemented version of SSH protocol.
+
+        protected List<SshService> _services;            // List of supported services.
+        protected SshService _activeService;             // Active service.
 
         protected EncryptionAlgorithm _encAlgCtoS;       // Algorithm to use for encryption of payloads sent from server to client.
         protected EncryptionAlgorithm _encAlgStoC;       // Algorithm to use for encryption of payloads sent from client to server.
@@ -67,43 +83,30 @@ namespace WindowsSshServer
 
         private bool _isDisposed = false;                // True if object has been disposed.
 
-        static SshTransport()
-        {
-            // Set default software version.
-            SshTransport.SoftwareVersion = "WindowsSshServer_"
-                + Assembly.GetExecutingAssembly().GetName().Version.ToString();
-        }
-
-        public static string SoftwareVersion
-        {
-            get;
-            set;
-        }
-
-        public SshTransport(IConnection connection)
+        public SshClient(IConnection connection)
             : this(connection, true)
         {
         }
 
-        public SshTransport(Stream stream)
+        public SshClient(Stream stream)
             : this(stream, true)
         {
         }
 
-        public SshTransport(IConnection connection, bool addDefaultAlgorithms)
+        public SshClient(IConnection connection, bool addDefaultAlgorithms)
             : this(connection.GetStream(), addDefaultAlgorithms)
         {
             _connection = connection;
         }
 
-        public SshTransport(Stream stream, bool addDefaultAlgorithms)
+        public SshClient(Stream stream, bool addDefaultAlgorithms)
         {
             _stream = stream;
 
             // Create RNG (random number generator).
             _rng = new RNGCryptoServiceProvider();
 
-            // Initialize properties to default.
+            // Initialize properties to default values.
             this.ServerComments = null;
             this.Languages = null;
 
@@ -115,9 +118,14 @@ namespace WindowsSshServer
 
             // Add default algorithms to lists of supported algorithms.
             if (addDefaultAlgorithms) AddDefaultAlgorithms();
+
+            // Add default services to list of supported services.
+            _services = new List<SshService>();
+            _services.Add(new SshAuthenticationService(this));
+            _services.Add(new SshConnectionService(this));
         }
 
-        ~SshTransport()
+        ~SshClient()
         {
             Dispose(false);
         }
@@ -136,14 +144,25 @@ namespace WindowsSshServer
                 {
                     // Dispose managed resources.
                     Disconnect();
-
                     if (_connection != null) _connection.Dispose();
+
+                    foreach (var service in _services) service.Dispose();
                 }
 
                 // Dispose unmanaged resources.
             }
 
             _isDisposed = true;
+        }
+
+        public List<SshService> Services
+        {
+            get { return _services; }
+        }
+
+        public byte[] SessionId
+        {
+            get { return _sessionId; }
         }
 
         public string ClientProtocolVersion
@@ -252,30 +271,43 @@ namespace WindowsSshServer
 
         public void Disconnect()
         {
-            Disconnect(SshDisconnectReason.ByApplication, "");
+            Disconnect("");
         }
 
-        protected void Disconnect(SshDisconnectReason reason, string description)
+        public void Disconnect(string message)
+        {
+            Disconnect(SshDisconnectReason.ByApplication, message);
+        }
+
+        internal void Disconnect(SshDisconnectReason reason, string description)
         {
             Disconnect(reason, description, "");
         }
 
-        protected void Disconnect(SshDisconnectReason reason, string description, string language)
+        internal void Disconnect(SshDisconnectReason reason, string description, string language)
         {
             try
             {
-                // Send Disconnect message to client.
-                SendMsgDisconnect(reason, description, language);
+                if (this.IsConnected)
+                {
+                    // Send Disconnect message to client.
+                    SendMsgDisconnect(reason, description, language);
+                }
             }
-            catch
+            finally
             {
+                // Disconnect from client.
+                Disconnect(false);
             }
-
-            // Disconnect from client.
-            Disconnect(false);
         }
 
-        protected virtual void Disconnect(bool remotely)
+        internal virtual void Disconnect(bool remotely)
+        {
+            Disconnect(remotely, SshDisconnectReason.None, null, null);
+        }
+
+        internal virtual void Disconnect(bool remotely, SshDisconnectReason reason, string description,
+            string language)
         {
             // Dispose objects for data transmission.
             if (_stream != null)
@@ -337,7 +369,7 @@ namespace WindowsSshServer
             if (_connection != null) _connection.Disconnect(remotely);
 
             // Client has disconnected.
-            OnDisconnected(new SshDisconnectedEventArgs(remotely));
+            OnDisconnected(new SshDisconnectedEventArgs(remotely, reason, description, language));
         }
 
         protected virtual void AddDefaultAlgorithms()
@@ -416,6 +448,284 @@ namespace WindowsSshServer
                 _cryptoTransformStoC.Dispose();
                 _cryptoTransformStoC = null;
             }
+        }
+
+        internal void SendPacket(byte[] payload)
+        {
+            // Calculate block size.
+            byte blockSize = (byte)(_encAlgStoC == null ? 8 :
+               _encAlgStoC.Algorithm.BlockSize / 8);
+
+            // Calculate random number of extra blocks of padding to add.
+            int maxNumExtraPaddingBlocks = (256 - blockSize) / blockSize;
+            int numExtraPaddingBlocks = _rng.GetNumber(0, maxNumExtraPaddingBlocks);
+
+            // Calculate packet length information.
+            // Packet size (minus MAC) must be multiple of 8 or cipher block size (whichever is larger).
+            // Minimum packet size (minus MAC) is 16.
+            // Padding length must be between 4 and 255 bytes.
+            byte paddingLength = (byte)(blockSize - ((5 + payload.Length) % blockSize)
+                + numExtraPaddingBlocks * blockSize);
+            if (paddingLength < 4) paddingLength += blockSize;
+            uint packetLength = (uint)payload.Length + paddingLength + 1;
+            byte[] padding;
+
+            if (packetLength < 12)
+            {
+                paddingLength += blockSize;
+                packetLength += blockSize;
+            }
+
+            // Create packet data to send.
+            // Note: temporary stream is needed so that packet data and MAC are sent at exactly the same time.
+            using (var tempStream = new MemoryStream())
+            {
+                using (var packetStream = new MemoryStream())
+                {
+                    using (var packetWriter = new SshStreamWriter(packetStream))
+                    {
+                        // Write length of packet.
+                        packetWriter.Write(packetLength);
+
+                        // Write length of random padding.
+                        packetWriter.Write(paddingLength);
+
+                        // Write payload data.
+                        packetWriter.Write(payload);
+
+                        // Write bytes of random padding.
+                        padding = new byte[paddingLength];
+                        _rng.GetBytes(padding);
+                        packetWriter.Write(padding);
+                    }
+
+                    // Get packet data.
+                    var packetData = packetStream.ToArray();
+
+                    if (_encAlgStoC != null)
+                    {
+                        // Write encrypted packet data to stream.
+                        var cryptoStream = new CryptoStream(tempStream, _cryptoTransformStoC,
+                            CryptoStreamMode.Write);
+
+                        // Write packet data to crypto stream.
+                        cryptoStream.Write(packetData, 0, packetData.Length);
+                    }
+                    else
+                    {
+                        // Write plain packet data to stream.
+                        tempStream.Write(packetData, 0, packetData.Length);
+                    }
+                }
+
+                // Write to debug.
+                SshMessage messageId = (SshMessage)(payload[0]);
+
+                Debug.WriteLine(string.Format("<<< {0}", messageId.ToString()));
+
+                // Write MAC (Message Authentication Code), if MAC algorithm has been agreed on.
+                if (_macAlgStoC != null)
+                {
+                    var mac = ComputeMac(_macAlgStoC, _sendPacketSeqNumber, packetLength, paddingLength,
+                        payload, padding);
+                    tempStream.Write(mac, 0, mac.Length);
+                }
+
+                // Write packet to stream.
+                _streamWriter.Write(tempStream.ToArray());
+            }
+
+            // Increment sequence number of next packet to send.
+            unchecked { _sendPacketSeqNumber++; }
+        }
+
+        internal void ReadPacket()
+        {
+            CachedStream cachedStream = null;
+            Stream cryptoStream = null;
+            uint packetLength;
+            byte paddingLength;
+            byte[] payload;
+            byte[] mac;
+
+            if (_encAlgCtoS != null)
+            {
+                // Packet is encrypted. Use crypto stream for reading.
+                cachedStream = new CachedStream(_stream);
+                cryptoStream = new CryptoStream(cachedStream, _cryptoTransformCtoS, CryptoStreamMode.Read);
+            }
+            else
+            {
+                // Packet is unencrypted. Use normal network stream for reading.
+                cryptoStream = _stream;
+            }
+
+            var cryptoStreamReader = new SshStreamReader(cryptoStream);
+
+            // Read packet length information.
+            packetLength = cryptoStreamReader.ReadUInt32();
+            paddingLength = cryptoStreamReader.ReadByte();
+
+            if (paddingLength < 4)
+            {
+                // Invalid padding length.
+                Disconnect(SshDisconnectReason.MacError, string.Format(
+                    "Invalid padding length", _receivePacketSeqNumber));
+                throw new SshDisconnectedException();
+            }
+
+            // Read payload data.
+            payload = new byte[packetLength - 1 - paddingLength];
+
+            cryptoStreamReader.Read(payload, 0, payload.Length);
+
+            // Skip bytes of random padding.
+            byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
+
+            // Check if currently using MAC algorithm.
+            if (_macAlgCtoS != null)
+            {
+                // Read MAC (Message Authentication Code).
+                // MAC is always unencrypted.
+                mac = new byte[_macAlgCtoS.DigestLength];
+                int macBytesRead = ReadCryptoStreamBuffer((CryptoStream)cryptoStream, mac, 0);
+                _streamReader.Read(mac, macBytesRead, mac.Length - macBytesRead);
+
+                if (macBytesRead > 0)
+                {
+                    // Hack: recreate decryptor with correct IV.
+                    _cryptoTransformCtoS.Dispose();
+                    _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
+                        cachedStream.GetBuffer(0));
+                }
+
+                // Verify MAC of received packet.
+                var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
+                    paddingLength, payload, padding);
+
+                if (!mac.ArrayEquals(expectedMac))
+                {
+                    // Invalid MAC.
+                    Disconnect(SshDisconnectReason.MacError, string.Format(
+                        "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
+                    throw new SshDisconnectedException();
+                }
+            }
+            else
+            {
+                // Set MAC to empty array.
+                mac = new byte[0];
+            }
+
+            // Check that packet length does not exceed maximum.
+            if (4 + packetLength + mac.Length > _maxPacketLength)
+            {
+                Disconnect(SshDisconnectReason.ProtocolError, "Packet length exceeds maximum.");
+                throw new SshDisconnectedException();
+            }
+
+            // Write to debug.
+            Debug.WriteLine(string.Format(">>> {0}", (SshMessage)payload[0]));
+
+            try
+            {
+                // Process received message for client and active service.
+                bool messageRecognised = false;
+
+                messageRecognised |= ProcessMessage(payload);
+                if (_activeService != null) messageRecognised |= _activeService.ProcessMessage(payload);
+
+                if (!messageRecognised)
+                {
+                    // Tell client that message was unrecognised.
+                    SendMsgUnimplemented();
+                }
+            }
+            catch (EndOfStreamException)
+            {
+                // Received message seems to be malformed.
+                Disconnect(SshDisconnectReason.ProtocolError, "Bad message format.");
+                throw new SshDisconnectedException();
+            }
+
+            // Increment sequence number of next packet to be received.
+            unchecked { _receivePacketSeqNumber++; }
+        }
+
+        protected void SendLine(string value)
+        {
+            // Write chars of line to stream.
+            byte[] buffer = Encoding.ASCII.GetBytes(value + "\r\n");
+
+            _streamWriter.Write(buffer);
+        }
+
+        protected string ReadLine()
+        {
+            var lineBuilder = new StringBuilder();
+
+            // Read chars from stream until LF (line feed) is found.
+            char curChar;
+
+            do
+            {
+                curChar = _streamReader.ReadChar();
+                lineBuilder.Append(curChar);
+            } while (curChar != '\n');
+
+            // Return line without trailing CR LF.
+            return lineBuilder.ToString(0, lineBuilder.Length - 2);
+        }
+
+        protected bool ProcessMessage(byte[] payload)
+        {
+            using (var msgStream = new MemoryStream(payload))
+            {
+                using (var msgReader = new SshStreamReader(msgStream))
+                {
+                    // Check message ID.
+                    SshMessage messageId = (SshMessage)msgReader.ReadByte();
+
+                    switch (messageId)
+                    {
+                        // Standard messages
+                        case SshMessage.Disconnect:
+                            ProcessMsgDisconnect(msgReader);
+                            break;
+                        case SshMessage.Ignore:
+                            ProcessMsgIgnore(msgReader);
+                            break;
+                        case SshMessage.Unimplemented:
+                            ProcessMsgUnimplemented(msgReader);
+                            break;
+                        case SshMessage.Debug:
+                            ProcessMsgDebug(msgReader);
+                            break;
+                        case SshMessage.ServiceRequest:
+                            ProcessMsgServiceRequest(msgReader);
+                            break;
+                        case SshMessage.KexInit:
+                            // Store payload of message.
+                            _clientKexInitPayload = payload;
+
+                            ProcessMsgKexInit(msgReader);
+                            break;
+                        case SshMessage.NewKeys:
+                            ProcessMsgNewKeys(msgReader);
+                            break;
+                        // Diffie-Hellman kex messages
+                        case SshMessage.Init:
+                            ProcessMsgDhKexInit(msgReader);
+                            break;
+                        // Unrecognised message
+                        default:
+                            return false;
+                    }
+                }
+            }
+
+            // Message was recognised.
+            return true;
         }
 
         protected void SendMsgKexDhReply(byte[] hostKeyAndCerts, byte[] clientExchangeValue,
@@ -579,7 +889,7 @@ namespace WindowsSshServer
             }
         }
 
-        protected void ReadMsgDisconnect(SshStreamReader msgReader)
+        protected void ProcessMsgDisconnect(SshStreamReader msgReader)
         {
             // Read disconnection info.
             SshDisconnectReason reason = (SshDisconnectReason)msgReader.ReadUInt32();
@@ -587,11 +897,11 @@ namespace WindowsSshServer
             string languageTag = msgReader.ToString();
 
             // Disconnect remotely.
-            Disconnect(true);
+            Disconnect(true, reason, description, languageTag);
             throw new SshDisconnectedException();
         }
 
-        protected void ReadMsgIgnore(SshStreamReader msgReader)
+        protected void ProcessMsgIgnore(SshStreamReader msgReader)
         {
             try
             {
@@ -603,13 +913,13 @@ namespace WindowsSshServer
             }
         }
 
-        protected void ReadMsgUnimplemented(SshStreamReader msgReader)
+        protected void ProcessMsgUnimplemented(SshStreamReader msgReader)
         {
             // Read sequence number of packet unrecognised by client. 
             uint packetSeqNumber = msgReader.ReadUInt32();
         }
 
-        protected void ReadMsgDebug(SshStreamReader msgReader)
+        protected void ProcessMsgDebug(SshStreamReader msgReader)
         {
             // Read debug information.
             bool alwaysDisplay = msgReader.ReadBoolean();
@@ -626,17 +936,33 @@ namespace WindowsSshServer
             OnDebugMessageReceived(new SshDebugMessageReceivedEventArgs(alwaysDisplay, message, languageTag));
         }
 
-        protected void ReadMsgServiceRequest(SshStreamReader msgReader)
+        protected void ProcessMsgServiceRequest(SshStreamReader msgReader)
         {
-            //
+            // Read name of service.
+            string serviceName = msgReader.ReadString();
+
+            // Try to find service in list of supported services.
+            SshService service = _services.SingleOrDefault(item => item.Name == serviceName);
+
+            if (service != null)
+            {
+                // Activate request service.
+                _activeService = service;
+                _activeService.Start();
+
+                // Send message to accept requested service.
+                SendMsgServiceAccept(_activeService.Name);
+            }
+            else
+            {
+                // Service was not found.
+                Disconnect(SshDisconnectReason.ServiceNotAvailable, string.Format(
+                    "The service with name {0} is not supported by this server."));
+                throw new SshDisconnectedException();
+            }
         }
 
-        protected void ReadMsgServiceAccept(SshStreamReader msgReader)
-        {
-            //
-        }
-
-        protected void ReadMsgDhKexInit(SshStreamReader msgReader)
+        protected void ProcessMsgDhKexInit(SshStreamReader msgReader)
         {
             // Read client exchange value.
             byte[] clientExchangeValue = msgReader.ReadMPInt();
@@ -667,7 +993,7 @@ namespace WindowsSshServer
             SendMsgNewKeys();
         }
 
-        protected void ReadMsgKexInit(SshStreamReader msgReader)
+        protected void ProcessMsgKexInit(SshStreamReader msgReader)
         {
             // Read random cookie.
             byte[] cookie = msgReader.ReadBytes(16);
@@ -710,7 +1036,7 @@ namespace WindowsSshServer
             }
         }
 
-        protected void ReadMsgNewKeys(SshStreamReader msgReader)
+        protected void ProcessMsgNewKeys(SshStreamReader msgReader)
         {
             // Dispose current algorithms.
             DisposeCurrentAlgorithms();
@@ -727,272 +1053,6 @@ namespace WindowsSshServer
 
             _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor();
             _cryptoTransformStoC = _encAlgStoC.Algorithm.CreateEncryptor();
-        }
-
-        protected void SendLine(string value)
-        {
-            // Write chars of line to stream.
-            byte[] buffer = Encoding.ASCII.GetBytes(value + "\r\n");
-
-            _streamWriter.Write(buffer);
-        }
-
-        protected string ReadLine()
-        {
-            var lineBuilder = new StringBuilder();
-
-            // Read chars from stream until LF (line feed) is found.
-            char curChar;
-
-            do
-            {
-                curChar = _streamReader.ReadChar();
-                lineBuilder.Append(curChar);
-            } while (curChar != '\n');
-
-            // Return line without trailing CR LF.
-            return lineBuilder.ToString(0, lineBuilder.Length - 2);
-        }
-
-        protected void SendPacket(byte[] payload)
-        {
-            // Calculate block size.
-            byte blockSize = (byte)(_encAlgStoC == null ? 8 :
-               _encAlgStoC.Algorithm.BlockSize / 8);
-
-            // Calculate random number of extra blocks of padding to add.
-            int maxNumExtraPaddingBlocks = (256 - blockSize) / blockSize;
-            int numExtraPaddingBlocks = _rng.GetNumber(0, maxNumExtraPaddingBlocks);
-
-            // Calculate packet length information.
-            // Packet size (minus MAC) must be multiple of 8 or cipher block size (whichever is larger).
-            // Minimum packet size (minus MAC) is 16.
-            // Padding length must be between 4 and 255 bytes.
-            byte paddingLength = (byte)(blockSize - ((5 + payload.Length) % blockSize)
-                + numExtraPaddingBlocks * blockSize);
-            if (paddingLength < 4) paddingLength += blockSize;
-            uint packetLength = (uint)payload.Length + paddingLength + 1;
-            byte[] padding;
-
-            if (packetLength < 12)
-            {
-                paddingLength += blockSize;
-                packetLength += blockSize;
-            }
-
-            // Create packet data to send.
-            // Note: temporary stream is needed so that packet data and MAC are sent at exactly the same time.
-            using (var tempStream = new MemoryStream())
-            {
-                using (var packetStream = new MemoryStream())
-                {
-                    using (var packetWriter = new SshStreamWriter(packetStream))
-                    {
-                        // Write length of packet.
-                        packetWriter.Write(packetLength);
-
-                        // Write length of random padding.
-                        packetWriter.Write(paddingLength);
-
-                        // Write payload data.
-                        packetWriter.Write(payload);
-
-                        // Write bytes of random padding.
-                        padding = new byte[paddingLength];
-                        _rng.GetBytes(padding);
-                        packetWriter.Write(padding);
-                    }
-
-                    // Get packet data.
-                    var packetData = packetStream.ToArray();
-
-                    if (_encAlgStoC != null)
-                    {
-                        // Write encrypted packet data to stream.
-                        var cryptoStream = new CryptoStream(tempStream, _cryptoTransformStoC,
-                            CryptoStreamMode.Write);
-
-                        // Write packet data to crypto stream.
-                        cryptoStream.Write(packetData, 0, packetData.Length);
-                    }
-                    else
-                    {
-                        // Write plain packet data to stream.
-                        tempStream.Write(packetData, 0, packetData.Length);
-                    }
-                }
-
-                // Write to debug.
-                SshMessage messageId = (SshMessage)(payload[0]);
-
-                Debug.WriteLine(string.Format("<<< {0}", messageId.ToString()));
-
-                // Write MAC (Message Authentication Code), if MAC algorithm has been agreed on.
-                if (_macAlgStoC != null)
-                {
-                    var mac = ComputeMac(_macAlgStoC, _sendPacketSeqNumber, packetLength, paddingLength, 
-                        payload, padding);
-                    tempStream.Write(mac, 0, mac.Length);
-                }
-
-                // Write packet to stream.
-                _streamWriter.Write(tempStream.ToArray());
-            }
-
-            // Increment sequence number of next packet to send.
-            unchecked { _sendPacketSeqNumber++; }
-        }
-
-        protected void ReadPacket()
-        {
-            CachedStream cachedStream = null;
-            Stream cryptoStream = null;
-            uint packetLength;
-            byte paddingLength;
-            byte[] payload;
-            byte[] mac;
-            
-            if (_encAlgCtoS != null)
-            {
-                // Packet is encrypted. Use crypto stream for reading.
-                cachedStream = new CachedStream(_stream);
-                cryptoStream = new CryptoStream(cachedStream, _cryptoTransformCtoS, CryptoStreamMode.Read);
-            }
-            else
-            {
-                // Packet is unencrypted. Use normal network stream for reading.
-                cryptoStream = _stream;
-            }
-            
-            var cryptoStreamReader = new SshStreamReader(cryptoStream);
-
-            // Read packet length information.
-            packetLength = cryptoStreamReader.ReadUInt32();
-            paddingLength = cryptoStreamReader.ReadByte();
-
-            if (paddingLength < 4)
-            {
-                // Invalid padding length.
-                Disconnect(SshDisconnectReason.MacError, string.Format(
-                    "Invalid padding length", _receivePacketSeqNumber));
-                throw new SshDisconnectedException();
-            }
-
-            // Read payload data.
-            payload = new byte[packetLength - 1 - paddingLength];
-
-            cryptoStreamReader.Read(payload, 0, payload.Length);
-
-            // Skip bytes of random padding.
-            byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
-
-            // Check if currently using MAC algorithm.
-            if (_macAlgCtoS != null)
-            {
-                // Read MAC (Message Authentication Code).
-                // MAC is always unencrypted.
-                mac = new byte[_macAlgCtoS.DigestLength];
-                int macBytesRead = ReadCryptoStreamBuffer((CryptoStream)cryptoStream, mac, 0);
-                _streamReader.Read(mac, macBytesRead, mac.Length - macBytesRead);
-
-                if (macBytesRead > 0)
-                {
-                    // Hack: recreate decryptor with correct IV.
-                    _cryptoTransformCtoS.Dispose();
-                    _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
-                        cachedStream.GetBuffer(0));
-                }
-
-                // Verify MAC of received packet.
-                var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
-                    paddingLength, payload, padding);
-
-                if (!mac.ArrayEquals(expectedMac))
-                {
-                    // Invalid MAC.
-                    Disconnect(SshDisconnectReason.MacError, string.Format(
-                        "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
-                    throw new SshDisconnectedException();
-                }
-            }
-            else
-            {
-                // Set MAC to empty array.
-                mac = new byte[0];
-            }
-
-            // Check that packet length does not exceed maximum.
-            if (4 + packetLength + mac.Length > _maxPacketLength)
-            {
-                Disconnect(SshDisconnectReason.ProtocolError, "Packet length exceeds maximum.");
-                throw new SshDisconnectedException();
-            }
-
-            // Read received message.
-            using (var msgStream = new MemoryStream(payload))
-            {
-                using (var msgReader = new SshStreamReader(msgStream))
-                {
-                    try
-                    {
-                        SshMessage messageId = (SshMessage)msgReader.ReadByte();
-
-                        // Write to debug.
-                        Debug.WriteLine(string.Format(">>> {0}", messageId.ToString()));
-
-                        // Check message ID.
-                        switch (messageId)
-                        {
-                            // Standard messages
-                            case SshMessage.Disconnect:
-                                ReadMsgDisconnect(msgReader);
-                                break;
-                            case SshMessage.Ignore:
-                                ReadMsgIgnore(msgReader);
-                                break;
-                            case SshMessage.Unimplemented:
-                                ReadMsgUnimplemented(msgReader);
-                                break;
-                            case SshMessage.Debug:
-                                ReadMsgDebug(msgReader);
-                                break;
-                            case SshMessage.ServiceRequest:
-                                ReadMsgServiceRequest(msgReader);
-                                break;
-                            case SshMessage.ServiceAccept:
-                                ReadMsgServiceAccept(msgReader);
-                                break;
-                            case SshMessage.KexInit:
-                                // Store payload of message.
-                                _clientKexInitPayload = payload;
-
-                                ReadMsgKexInit(msgReader);
-                                break;
-                            case SshMessage.NewKeys:
-                                ReadMsgNewKeys(msgReader);
-                                break;
-                            // Diffie-Hellman kex messages
-                            case SshMessage.Init:
-                                ReadMsgDhKexInit(msgReader);
-                                break;
-                            // Unrecognised message
-                            default:
-                                // Send Unimplemented message back to client.
-                                SendMsgUnimplemented();
-                                break;
-                        }
-                    }
-                    catch (EndOfStreamException)
-                    {
-                        // End of stream here means that the received message was found to be malformed.
-                        Disconnect(SshDisconnectReason.ProtocolError, "Bad message format.");
-                        throw new SshDisconnectedException();
-                    }
-                }
-            }
-
-            // Increment sequence number of next packet to be received.
-            unchecked { _receivePacketSeqNumber++; }
         }
 
         protected int ReadCryptoStreamBuffer(CryptoStream stream, byte[] buffer, int offset)
@@ -1347,7 +1407,7 @@ namespace WindowsSshServer
             {
                 // Create and send server identification string.
                 _serverIdString = string.Format("SSH-{0}-{1}", _protocolVersion,
-                    SshTransport.SoftwareVersion) + (this.ServerComments == null ? "" : " "
+                    SshClient.SoftwareVersion) + (this.ServerComments == null ? "" : " "
                     + this.ServerComments);
 
                 SendLine(_serverIdString);
@@ -1442,12 +1502,42 @@ namespace WindowsSshServer
 
     public class SshDisconnectedEventArgs : EventArgs
     {
+        public SshDisconnectedEventArgs(bool disconnectedRemotely, SshDisconnectReason reason,
+            string description, string language)
+        {
+            this.DisconnectedRemotely = disconnectedRemotely;
+            this.Reason = reason;
+            this.Description = description;
+            this.Language = language;
+        }
+
         public SshDisconnectedEventArgs(bool disconnectedRemotely)
         {
             this.DisconnectedRemotely = disconnectedRemotely;
+            this.Reason = SshDisconnectReason.None;
+            this.Description = null;
+            this.Language = null;
         }
 
         public bool DisconnectedRemotely
+        {
+            get;
+            protected set;
+        }
+
+        public SshDisconnectReason Reason
+        {
+            get;
+            protected set;
+        }
+
+        public string Description
+        {
+            get;
+            protected set;
+        }
+
+        public string Language
         {
             get;
             protected set;
@@ -1498,6 +1588,7 @@ namespace WindowsSshServer
 
     public enum SshDisconnectReason : uint
     {
+        None = 0, // Not used by protocol
         HostNotAllowedToConnect = 1,
         ProtocolError = 2,
         KeyExchangeFailed = 3,
@@ -1515,7 +1606,7 @@ namespace WindowsSshServer
         IllegalUserName = 15
     }
 
-    public enum SshMessage : byte
+    internal enum SshMessage : byte
     {
         Disconnect = 1,
         Ignore = 2,

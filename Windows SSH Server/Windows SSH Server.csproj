@@ -69,9 +69,10 @@
     <Compile Include="BasicExtensions.cs" />
     <Compile Include="CompressionAlgorithm.cs" />
     <Compile Include="CachedStream.cs" />
+    <Compile Include="SshConnectionService.cs" />
     <Compile Include="IConnection.cs" />
-    <Compile Include="SshAuthentication.cs" />
-    <Compile Include="SshConnection.cs" />
+    <Compile Include="SshService.cs" />
+    <Compile Include="SshAuthenticationService.cs" />
     <Compile Include="SshException.cs" />
     <Compile Include="CryptoExtensions.cs" />
     <Compile Include="MacAlgorithm.cs" />
@@ -111,7 +112,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="SshTransport.cs" />
+    <Compile Include="SshClient.cs" />
     <Compile Include="SshDisconnectedException.cs" />
     <Compile Include="SshTcpServer.cs" />
     <Compile Include="SshStreamReader.cs" />

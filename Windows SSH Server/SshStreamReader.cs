@@ -45,6 +45,7 @@ namespace WindowsSshServer
         public byte[] ReadByteString()
         {
             var strLength = ReadUInt32();
+
             return ReadBytes(strLength);
         }
 
@@ -59,24 +60,20 @@ namespace WindowsSshServer
         public byte[] ReadMPInt()
         {
             var strLength = ReadUInt32();
+
             return ReadBytes(strLength);
         }
 
         public string ReadString()
         {
-            // Read string of known length from stream.
-            uint length = ReadUInt32();
-            //byte[] buffer = new byte[length];
-
-            //int bytesRead = _stream.Read(buffer, 0, buffer.Length);
-            //if (bytesRead == 0 && buffer.Length > 0) throw new EndOfStreamException();
+            var length = ReadUInt32();
 
             return Encoding.ASCII.GetString(ReadBytes(length));
         }
 
         public char ReadChar()
         {
-            int num = _stream.ReadByte();
+            var num = _stream.ReadByte();
 
             if (num == -1) throw new EndOfStreamException();
             return Encoding.ASCII.GetChars(new byte[] { (byte)num })[0];

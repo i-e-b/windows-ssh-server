@@ -7,7 +7,7 @@ namespace WindowsSshServer
 {
     public static class BasicExtensions
     {
-        public static bool Equals(this byte[] a, byte[] b)
+        public static bool ArrayEquals(this byte[] a, byte[] b)
         {
             if (a.Length != b.Length) return false;
 

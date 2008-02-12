@@ -6,9 +6,9 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshTripleDesCbc : EncryptionAlgorithm
+    public class SshTripleDesCbc : EncryptionAlgorithm
     {
-        internal SshTripleDesCbc()
+        public SshTripleDesCbc()
             : base()
         {
             _algorithm = new TripleDESCryptoServiceProvider();
@@ -18,6 +18,11 @@ namespace WindowsSshServer.Algorithms
         public override string Name
         {
             get { return "3des-cbc"; }
+        }
+
+        public override object Clone()
+        {
+            return new SshTripleDesCbc();
         }
     }
 }

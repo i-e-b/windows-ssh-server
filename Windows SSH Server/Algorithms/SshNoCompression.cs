@@ -6,9 +6,9 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshNoCompression : CompressionAlgorithm
+    public sealed class SshNoCompression : CompressionAlgorithm
     {
-        internal SshNoCompression()
+        public SshNoCompression()
             : base()
         {
         }
@@ -26,6 +26,11 @@ namespace WindowsSshServer.Algorithms
         public override byte[] Decompress(byte[] input)
         {
             return input;
+        }
+
+        public override object Clone()
+        {
+            return new SshNoCompression();
         }
     }
 }

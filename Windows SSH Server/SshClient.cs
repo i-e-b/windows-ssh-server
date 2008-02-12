@@ -19,46 +19,65 @@ namespace WindowsSshServer
     public class SshClient : IDisposable
     {
         public event EventHandler<EventArgs> Connected;
-        public event EventHandler<DisconnectedEventArgs> Disconnected;
+        public event EventHandler<SshDisconnectedEventArgs> Disconnected;
         public event EventHandler<EventArgs> Error;
-        public event EventHandler<EventArgs> DebugMessageReceived;
+        public event EventHandler<SshDebugMessageReceivedEventArgs> DebugMessageReceived;
 
         protected const uint _maxPacketLength = 35000;   // Maximum total length of packet.
 
         protected const string _protocolVersion = "2.0"; // Implemented version of SSH protocol.
 
-        protected KexAlgorithm _kexAlgorithm;    // Algorithm to use for kex (key exchange).
+        protected KexAlgorithm _kexAlgorithm;     // Algorithm to use for kex (key exchange).
         protected PublicKeyAlgorithm
-            _hostKeyAlgorithm;                   // Algorithm to use for host key.
-        protected EncryptionAlgorithm
-            _encryptionAlgorithm;                // Algorithm to use for encryption of payloads.
-        protected CompressionAlgorithm
-            _compressionAlgorithm;               // Algorithm to use for compression of payloads.
-        protected MacAlgorithm _macAlgorithm;    // Algorithm to use for computing MAC (Message Authentication Code).
+            _hostKeyAlgorithm;                    // Algorithm to use for host key.
 
         protected EncryptionAlgorithm
-            _newEncryptionAlgorithm;             // New algorithm to use for encryption of payloads.
+            _encryptionAlgorithmCtoS;             // Algorithm to use for encryption of payloads sent from server to client.
+        protected EncryptionAlgorithm
+            _encryptionAlgorithmStoC;             // Algorithm to use for encryption of payloads sent from client to server.
+        protected MacAlgorithm
+            _macAlgorithmCtoS;                    // Algorithm to use for computing MACs (Message Authentication Codes) sent from server to client.
+        protected MacAlgorithm
+            _macAlgorithmStoC;                    // Algorithm to use for computing MACs (Message Authentication Codes) sent from client to server.
         protected CompressionAlgorithm
-            _newCompressionAlgorithm;            // New algorithm to use for compression of payloads.
-        protected MacAlgorithm _newMacAlgorithm; // New algorithm to use for computing MAC (Message Authentication Code).
+            _compressionAlgorithmCtoS;            // Algorithm to use for compression of payloads sent from client to server.
+        protected CompressionAlgorithm
+            _compressionAlgorithmStoC;            // Algorithm to use for compression of payloads sent from server to client.
+        protected string _languageCtoS;           // Language to use for message sent from client to server.
+        protected string _languageStoC;           // Language to use for message sent from server to client.
 
-        protected RNGCryptoServiceProvider _rng; // Random number generator.
-        protected uint _sendPacketSeqNumber;     // Sequence number of next packet to send.
-        protected uint _receivePacketSeqNumber;  // Sequence number of next packet to be received.
-        protected string _serverIdString;        // ID string for server.
-        protected string _clientIdString;        // ID string for client.
-        protected byte[] _serverKexInitPayload;  // Payload of Kex Init message sent by server.
-        protected byte[] _clientKexInitPayload;  // Payload of Kex Init message sent by client.
-        protected byte[] _exchangeHash;          // Current exchange hash.
-        protected byte[] _sessionId;             // Session identifier, which is the first exchange hash.
+        protected EncryptionAlgorithm
+            _newEncryptionAlgorithmCtoS;          // New algorithm to use for encryption of payloads sent from server to client.
+        protected EncryptionAlgorithm
+            _newEncryptionAlgorithmStoC;          // New algorithm to use for encryption of payloads sent from client to server.
+        protected MacAlgorithm
+            _newMacAlgorithmCtoS;                 // New algorithm to use for computing MACs (Message Authentication Codes) sent from server to client.
+        protected MacAlgorithm
+            _newMacAlgorithmStoC;                 // New algorithm to use for computing MACs (Message Authentication Codes) sent from client to server.
+        protected CompressionAlgorithm
+            _newCompressionAlgorithmCtoS;         // New algorithm to use for compression of payloads sent from client to server.
+        protected CompressionAlgorithm
+            _newCompressionAlgorithmStoC;         // New algorithm to use for compression of payloads sent from server to client.
+        protected string _newLanguageCtoS;        // Language to use for message sent from client to server.
+        protected string _newLanguageStoC;        // Language to use for message sent from server to client.
 
-        protected TcpClient _tcpClient;          // Client TCP connection.
-        protected NetworkStream _networkStream;  // Stream for transmitting data across connection.
-        protected SshStreamWriter _streamWriter; // Writes data to network stream.
-        protected SshStreamReader _streamReader; // Reads data from network stream.
-        protected Thread _receiveThread;         // Thread on which to wait for received data.
+        protected RNGCryptoServiceProvider _rng;  // Random number generator.
+        protected uint _sendPacketSeqNumber;      // Sequence number of next packet to send.
+        protected uint _receivePacketSeqNumber;   // Sequence number of next packet to be received.
+        protected string _serverIdString;         // ID string for server.
+        protected string _clientIdString;         // ID string for client.
+        protected byte[] _serverKexInitPayload;   // Payload of Kex Init message sent by server.
+        protected byte[] _clientKexInitPayload;   // Payload of Kex Init message sent by client.
+        protected byte[] _exchangeHash;           // Current exchange hash.
+        protected byte[] _sessionId;              // Session identifier, which is the first exchange hash.
 
-        private bool _isDisposed = false;        // True if object has been disposed.
+        protected IConnection _connection;        // Connection to client that provides data stream.
+        protected Stream _stream;                 // Stream over which to transmit data.
+        protected SshStreamWriter _streamWriter;  // Writes SSH data to stream.
+        protected SshStreamReader _streamReader;  // Reads SSH data from stream.
+        protected Thread _receiveThread;          // Thread on which to wait for received data.
+
+        private bool _isDisposed = false;         // True if object has been disposed.
 
         static SshClient()
         {
@@ -73,9 +92,25 @@ namespace WindowsSshServer
             set;
         }
 
-        public SshClient(TcpClient tcpClient)
+        public SshClient(IConnection connection)
+            : this(connection, true)
         {
-            _tcpClient = tcpClient;
+        }
+
+        public SshClient(Stream stream)
+            : this(stream, true)
+        {
+        }
+
+        public SshClient(IConnection connection, bool addDefaultAlgorithms)
+            : this(connection.GetStream(), addDefaultAlgorithms)
+        {
+            _connection = connection;
+        }
+
+        public SshClient(Stream stream, bool addDefaultAlgorithms)
+        {
+            _stream = stream;
 
             // Create RNG (random number generator).
             _rng = new RNGCryptoServiceProvider();
@@ -86,16 +121,23 @@ namespace WindowsSshServer
 
             this.KexAlgorithms = new List<KexAlgorithm>();
             this.HostKeyAlgorithms = new List<PublicKeyAlgorithm>();
-            this.MacAlgorithms = new List<MacAlgorithm>();
             this.EncryptionAlgorithms = new List<EncryptionAlgorithm>();
+            this.MacAlgorithms = new List<MacAlgorithm>();
             this.CompressionAlgorithms = new List<CompressionAlgorithm>();
 
-            AddDefaultAlgorithms();
+            // Add default algorithms to lists of supported algorithms.
+            if (addDefaultAlgorithms) AddDefaultAlgorithms();
         }
 
         ~SshClient()
         {
             Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -106,18 +148,14 @@ namespace WindowsSshServer
                 {
                     // Dispose managed resources.
                     Disconnect();
+
+                    if (_connection != null) _connection.Dispose();
                 }
 
                 // Dispose unmanaged resources.
             }
 
             _isDisposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public string ClientProtocolVersion
@@ -174,7 +212,7 @@ namespace WindowsSshServer
             set;
         }
 
-        public IList<SshLanguage> Languages
+        public IList<string> Languages
         {
             get;
             set;
@@ -182,15 +220,28 @@ namespace WindowsSshServer
 
         public bool IsConnected
         {
-            get { return _tcpClient != null; }
+            get { return _stream != null; }
+        }
+
+        public void ReexchangeKeys()
+        {
+            // Set all new algorithms to null.
+            _newEncryptionAlgorithmCtoS = null;
+            _newEncryptionAlgorithmStoC = null;
+            _newMacAlgorithmCtoS = null;
+            _newMacAlgorithmStoC = null;
+            _newCompressionAlgorithmCtoS = null;
+            _newCompressionAlgorithmStoC = null;
+
+            // Send kex initialization message.
+            SendMsgKexInit();
         }
 
         public virtual void ConnectionEstablished()
         {
             // Create network objects.
-            _networkStream = _tcpClient.GetStream();
-            _streamWriter = new SshStreamWriter(_networkStream);
-            _streamReader = new SshStreamReader(_networkStream);
+            _streamWriter = new SshStreamWriter(_stream);
+            _streamReader = new SshStreamReader(_stream);
 
             _sendPacketSeqNumber = 0;
             _receivePacketSeqNumber = 0;
@@ -202,7 +253,8 @@ namespace WindowsSshServer
             _receiveThread = new Thread(new ThreadStart(ReceiveData));
             _receiveThread.Start();
 
-            OnConnected();
+            // Client has connected.
+            OnConnected(new EventArgs());
         }
 
         public void Connect()
@@ -212,22 +264,24 @@ namespace WindowsSshServer
 
         public void Disconnect()
         {
-            Disconnect(SshDisconnectReason.ByApplication, null);
+            Disconnect(SshDisconnectReason.ByApplication, "");
         }
 
         protected void Disconnect(SshDisconnectReason reason, string description)
         {
-            Disconnect(reason, description, SshLanguage.None);
+            Disconnect(reason, description, "");
         }
 
-        protected void Disconnect(SshDisconnectReason reason, string description, SshLanguage language)
+        protected void Disconnect(SshDisconnectReason reason, string description, string language)
         {
             try
             {
                 // Send Disconnect message to client.
                 SendMsgDisconnect(reason, description, language);
             }
-            catch { }
+            catch
+            {
+            }
 
             // Disconnect from client.
             Disconnect(false);
@@ -235,65 +289,72 @@ namespace WindowsSshServer
 
         protected virtual void Disconnect(bool remotely)
         {
-            if (_tcpClient == null) return;
-
-            // Close connection objects.
-            _tcpClient.Close();
-            _tcpClient = null;
-
-            if (_networkStream != null) _networkStream.Dispose();
-            if (_streamWriter != null) _streamWriter.Close();
-            if (_streamReader != null) _streamReader.Close();
-            if (_receiveThread != null && Thread.CurrentThread != _receiveThread) _receiveThread.Abort();
-
-            if (_kexAlgorithm != null)
+            // Dispose objects for data transmission.
+            if (_stream != null)
             {
-                _kexAlgorithm.Dispose();
-                _kexAlgorithm = null;
+                _stream.Dispose();
+                _stream = null;
             }
-            if (_hostKeyAlgorithm != null)
+            if (_streamWriter != null)
             {
-                _hostKeyAlgorithm.Dispose();
-                _hostKeyAlgorithm = null;
+                _streamWriter.Close();
+                _streamWriter = null;
             }
-            if (_encryptionAlgorithm != null)
+            if (_streamReader != null)
             {
-                _encryptionAlgorithm.Dispose();
-                _encryptionAlgorithm = null;
+                _streamReader.Close();
+                _streamReader = null;
             }
-            if (_compressionAlgorithm != null)
+            if (_receiveThread != null && Thread.CurrentThread != _receiveThread)
             {
-                _compressionAlgorithm.Dispose();
-                _compressionAlgorithm = null;
-            }
-            if (_macAlgorithm != null)
-            {
-                _macAlgorithm.Dispose();
-                _macAlgorithm = null;
+                _receiveThread.Abort();
+                _receiveThread = null;
             }
 
-            if (_newEncryptionAlgorithm != null)
+            // Dispose algorithms (current and new).
+            DisposeCurrentAlgorithms();
+
+            if (_newEncryptionAlgorithmCtoS != null)
             {
-                _newEncryptionAlgorithm.Dispose();
-                _newEncryptionAlgorithm = null;
+                _newEncryptionAlgorithmCtoS.Dispose();
+                _newEncryptionAlgorithmCtoS = null;
             }
-            if (_newCompressionAlgorithm != null)
+            if (_newEncryptionAlgorithmStoC != null)
             {
-                _newCompressionAlgorithm.Dispose();
-                _newCompressionAlgorithm = null;
+                _newEncryptionAlgorithmStoC.Dispose();
+                _newEncryptionAlgorithmStoC = null;
             }
-            if (_newMacAlgorithm != null)
+            if (_newMacAlgorithmCtoS != null)
             {
-                _newMacAlgorithm.Dispose();
-                _newMacAlgorithm = null;
+                _newMacAlgorithmCtoS.Dispose();
+                _newMacAlgorithmCtoS = null;
+            }
+            if (_newMacAlgorithmStoC != null)
+            {
+                _newMacAlgorithmStoC.Dispose();
+                _newMacAlgorithmStoC = null;
+            }
+            if (_newCompressionAlgorithmCtoS != null)
+            {
+                _newCompressionAlgorithmCtoS.Dispose();
+                _newCompressionAlgorithmCtoS = null;
+            }
+            if (_newCompressionAlgorithmStoC != null)
+            {
+                _newCompressionAlgorithmStoC.Dispose();
+                _newCompressionAlgorithmStoC = null;
             }
 
-            OnDisconnected(remotely);
+            // Disconnect connection object.
+            if (_connection != null) _connection.Disconnect(remotely);
+
+            // Client has disconnected.
+            OnDisconnected(new SshDisconnectedEventArgs(remotely));
         }
 
         protected virtual void AddDefaultAlgorithms()
         {
-            // Add default algorithms to lists for this client.
+            // Add default algorithms to lists of supported algorithms.
             this.KexAlgorithms.Add(new SshDiffieHellmanGroup1Sha1());
             this.KexAlgorithms.Add(new SshDiffieHellmanGroup14Sha1());
 
@@ -310,35 +371,65 @@ namespace WindowsSshServer
             this.MacAlgorithms.Add(new SshHmacMd5());
             this.MacAlgorithms.Add(new SshHmacMd5_96());
 
-            this.CompressionAlgorithms.Add(new SshZlibCompression());
+            //this.CompressionAlgorithms.Add(new SshZlibCompression());
             this.CompressionAlgorithms.Add(new SshNoCompression());
         }
 
-        protected void SendMsgKexDhReply(byte[] clientExchangeValue)
+        protected void DisposeCurrentAlgorithms()
         {
-            // Create server kex value.
-            byte[] serverExchangeValue = _kexAlgorithm.CreateKeyExchange();
+            // Dispose all current algorithms
+            if (_kexAlgorithm != null)
+            {
+                _kexAlgorithm.Dispose();
+                _kexAlgorithm = null;
+            }
+            if (_hostKeyAlgorithm != null)
+            {
+                _hostKeyAlgorithm.Dispose();
+                _hostKeyAlgorithm = null;
+            }
+            if (_encryptionAlgorithmCtoS != null)
+            {
+                _encryptionAlgorithmCtoS.Dispose();
+                _encryptionAlgorithmCtoS = null;
+            }
+            if (_encryptionAlgorithmStoC != null)
+            {
+                _encryptionAlgorithmStoC.Dispose();
+                _encryptionAlgorithmStoC = null;
+            }
+            if (_macAlgorithmCtoS != null)
+            {
+                _macAlgorithmCtoS.Dispose();
+                _macAlgorithmCtoS = null;
+            }
+            if (_macAlgorithmStoC != null)
+            {
+                _macAlgorithmStoC.Dispose();
+                _macAlgorithmStoC = null;
+            }
+            if (_compressionAlgorithmCtoS != null)
+            {
+                _compressionAlgorithmCtoS.Dispose();
+                _compressionAlgorithmCtoS = null;
+            }
+            if (_compressionAlgorithmStoC != null)
+            {
+                _compressionAlgorithmStoC.Dispose();
+                _compressionAlgorithmStoC = null;
+            }
+        }
 
-            // Decrypt shared secret from kex value.
-            byte[] sharedSecret = _kexAlgorithm.DecryptKeyExchange(clientExchangeValue);
-
-            // Get public host key and certificates.
-            byte[] hostKeyAndCerts = _hostKeyAlgorithm.CreateKeyData();
-
-            // Compute exchange hash.
-            _exchangeHash = ComputeExchangeHash(hostKeyAndCerts, clientExchangeValue, serverExchangeValue,
-                sharedSecret);
-
-            // Set session identifier if it has not already been set.
-            if (_sessionId == null) _sessionId = _exchangeHash;
-
+        protected void SendMsgKexDhReply(byte[] hostKeyAndCerts, byte[] clientExchangeValue,
+            byte[] serverExchangeValue)
+        {
             // Create message to send.
             using (var msgStream = new MemoryStream())
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
                     // Write message ID.
-                    msgWriter.Write((byte)SshMessageKexDiffieHellman.Reply);
+                    msgWriter.Write((byte)SshMessage.Reply);
 
                     // Send server public host key and certificates.
                     msgWriter.WriteByteString(hostKeyAndCerts);
@@ -357,8 +448,7 @@ namespace WindowsSshServer
             }
         }
 
-        protected void SendMsgDisconnect(SshDisconnectReason reason, string description,
-            SshLanguage language)
+        protected void SendMsgDisconnect(SshDisconnectReason reason, string description, string language)
         {
             // Create message to send.
             using (var msgStream = new MemoryStream())
@@ -372,10 +462,10 @@ namespace WindowsSshServer
                     msgWriter.Write((uint)reason);
 
                     // Write human-readable description of reason for disconnection.
-                    msgWriter.Write(Encoding.UTF8.GetBytes(description));
+                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(description));
 
                     // Write language tag.
-                    msgWriter.Write(language.Tag);
+                    msgWriter.Write(language);
                 }
 
                 // Send Disconnect message.
@@ -438,7 +528,7 @@ namespace WindowsSshServer
 
                     // Write lists of languages.
                     string[] langTags = this.Languages == null ? new string[0]
-                        : (from lang in this.Languages select lang.Tag).ToArray();
+                        : (from lang in this.Languages select lang).ToArray();
 
                     msgWriter.WriteNameList(langTags);
                     msgWriter.WriteNameList(langTags);
@@ -508,12 +598,14 @@ namespace WindowsSshServer
             Debug.WriteLine(message);
             Debug.WriteLine("");
 
-            // Raise event: debug message has been received.
-            if (DebugMessageReceived != null) DebugMessageReceived(this, new EventArgs());
+            // Debug message has been received.
+            OnDebugMessageReceived(new SshDebugMessageReceivedEventArgs(alwaysDisplay, message, languageTag));
         }
 
         protected void ReadMsgServiceRequest(SshStreamReader msgReader)
         {
+            throw new IOException();
+
             //
         }
 
@@ -527,8 +619,27 @@ namespace WindowsSshServer
             // Read client exchange value.
             byte[] clientExchangeValue = msgReader.ReadMPInt();
 
+            // Create server kex value.
+            byte[] serverExchangeValue = _kexAlgorithm.CreateKeyExchange();
+
+            // Decrypt shared secret from kex value.
+            byte[] sharedSecret = _kexAlgorithm.DecryptKeyExchange(clientExchangeValue);
+
+            // Create data for public host key and certificates.
+            byte[] hostKeyAndCerts = _hostKeyAlgorithm.CreateKeyAndCertificatesData();
+
+            // Compute exchange hash.
+            _exchangeHash = ComputeExchangeHash(hostKeyAndCerts, clientExchangeValue, serverExchangeValue,
+                sharedSecret);
+
+            // Set session identifier if it has not already been set.
+            if (_sessionId == null) _sessionId = _exchangeHash;
+
+            // Generate keys from shared secret and exchange hash.
+            GenerateKeys(sharedSecret);
+
             // Send Diffie-Hellman Reply message.
-            SendMsgKexDhReply(clientExchangeValue);
+            SendMsgKexDhReply(hostKeyAndCerts, clientExchangeValue, serverExchangeValue);
 
             // Send New Keys message to start using new keys.
             SendMsgNewKeys();
@@ -553,75 +664,44 @@ namespace WindowsSshServer
             bool firstKexPacketFollows = msgReader.ReadBoolean();
             uint reserved0 = msgReader.ReadUInt32();
 
-            // Pick kex algorithm to use (see RFC4253 section 7.1).
-            KexAlgorithm kexAlg = null;
+            // Choose algorithms to use.
+            _kexAlgorithm = ChooseKexAlgorithm(kexAlgorithms);
+            _hostKeyAlgorithm = ChooseHostKeyAlgorithm(serverHostKeyAlgorithms);
 
-            foreach (var kexAlgName in kexAlgorithms)
-            {
-                // Try to find supported algorithm with current name.
-                kexAlg = this.KexAlgorithms.SingleOrDefault(item => kexAlgName == item.Name);
+            _newEncryptionAlgorithmCtoS = ChooseEncryptionAlgorithm(encryptionAlgorithmsCtoS);
+            _newEncryptionAlgorithmStoC = ChooseEncryptionAlgorithm(encryptionAlgorithmsStoC);
+            _newMacAlgorithmCtoS = ChooseMacAlgorithm(macAlgorithmsCtoS);
+            _newMacAlgorithmStoC = ChooseMacAlgorithm(macAlgorithmsStoC);
+            _newCompressionAlgorithmCtoS = ChooseCompressionAlgorithm(compAlgorithmsCtoS);
+            _newCompressionAlgorithmStoC = ChooseCompressionAlgorithm(compAlgorithmsStoC);
+            _newLanguageCtoS = ChooseLanguage(langsCtoS);
+            _newLanguageStoC = ChooseLanguage(langsStoC);
 
-                if (kexAlg != null)
-                {
-                    // Set kex algorithm to use.
-                    _kexAlgorithm = kexAlg;
-                    break;
-                }
-            }
-
-            // Check that kex algorithm was found.
-            if (_kexAlgorithm == null)
-            {
-                Disconnect(SshDisconnectReason.KeyExchangeFailed,
-                    "None of the key exchange algorithms listed are supported.");
-                return;
-            }
-
-            // Pick server host key algorithm to use (see RFC4253 section 7.1).
-            PublicKeyAlgorithm hostKeyAlg = null;
-
-            foreach (var hostKeyAlgName in serverHostKeyAlgorithms)
-            {
-                // Try to find supported algorithm with current name.
-                hostKeyAlg = this.HostKeyAlgorithms.SingleOrDefault(item => hostKeyAlgName == item.Name);
-
-                if (hostKeyAlg != null)
-                {
-                    // Set host key algorithm to use.
-                    _hostKeyAlgorithm = hostKeyAlg;
-                    break;
-                }
-            }
-
-            // Check that host key algorithm was found.
-            if (_hostKeyAlgorithm == null)
-            {
-                Disconnect(SshDisconnectReason.KeyExchangeFailed,
-                    "None of the server host key algorithms listed are supported.");
-                return;
-            }
-
-            // Load key for host algorithm.
+            // Load host key for chosen algorithm.
             if (_hostKeyAlgorithm is SshDss)
             {
-                SshDss hostKeyAlgDss = (SshDss)_hostKeyAlgorithm;
-
-                hostKeyAlg.ImportKey(@"../../Keys/dss-default.key");
+                _hostKeyAlgorithm.ImportKey(@"../../Keys/dss-default.key");
             }
             else if (_hostKeyAlgorithm is SshRsa)
             {
-                SshRsa hostKeyAlgRsa = (SshRsa)_hostKeyAlgorithm;
-
-                hostKeyAlg.ImportKey(@"../../Keys/rsa-default.key");
+                _hostKeyAlgorithm.ImportKey(@"../../Keys/rsa-default.key");
             }
         }
 
         protected void ReadMsgNewKeys(SshStreamReader msgReader)
         {
+            // Dispose current algorithms.
+            DisposeCurrentAlgorithms();
+
             // Start using new keys and algorithms.
-            _encryptionAlgorithm = _newEncryptionAlgorithm;
-            _compressionAlgorithm = _newCompressionAlgorithm;
-            _macAlgorithm = _newMacAlgorithm;
+            _encryptionAlgorithmCtoS = _newEncryptionAlgorithmCtoS;
+            _encryptionAlgorithmStoC = _newEncryptionAlgorithmStoC;
+            _compressionAlgorithmCtoS = _newCompressionAlgorithmCtoS;
+            _compressionAlgorithmStoC = _newCompressionAlgorithmStoC;
+            _macAlgorithmCtoS = _newMacAlgorithmCtoS;
+            _macAlgorithmStoC = _newMacAlgorithmStoC;
+            _languageCtoS = _newLanguageCtoS;
+            _languageStoC = _newLanguageStoC;
         }
 
         protected void SendLine(string value)
@@ -651,39 +731,71 @@ namespace WindowsSshServer
 
         protected void SendPacket(byte[] payload)
         {
+            // Calculate block size.
+            byte blockSize = (byte)(_encryptionAlgorithmStoC == null ? 8 :
+                _encryptionAlgorithmStoC.Algorithm.BlockSize);
+
+            // Calculate random number of extra blocks of padding to add.
+            int maxNumExtraPaddingBlocks = (256 - blockSize) / blockSize;
+            int numExtraPaddingBlocks = _rng.GetNumber(0, maxNumExtraPaddingBlocks / 2);
+
             // Calculate packet length information.
-            byte paddingLength = (byte)(8 - ((5 + payload.Length) % 8));
-            if (paddingLength < 4) paddingLength += 8;
+            // Packet size (minus MAC) must be multiple of 8 or cipher block size (whichever is larger).
+            // Minimum packet size (minus MAC) is 16.
+            // Padding length must be between 4 and 255 bytes.
+            byte paddingLength = (byte)(blockSize - ((5 + payload.Length) % blockSize)
+                + numExtraPaddingBlocks * blockSize);
+            if (paddingLength < 4) paddingLength += blockSize;
             uint packetLength = (uint)payload.Length + paddingLength + 1;
+            byte[] padding;
 
-            // Create packet data.
-            byte[] packetData;
+            if (packetLength < 12)
+            {
+                paddingLength += blockSize;
+                packetLength += blockSize;
+            }
 
+            // Create packet data to send.
             using (var packetStream = new MemoryStream())
             {
                 using (var packetWriter = new SshStreamWriter(packetStream))
                 {
                     // Write length of packet.
-                    _streamWriter.Write(packetLength);
+                    packetWriter.Write(packetLength);
 
                     // Write length of random padding.
-                    _streamWriter.Write(paddingLength);
+                    packetWriter.Write(paddingLength);
 
                     // Write payload data.
-                    _streamWriter.Write(payload);
+                    packetWriter.Write(payload);
 
                     // Write bytes of random padding.
-                    byte[] padding = new byte[paddingLength];
-
+                    padding = new byte[paddingLength];
                     _rng.GetBytes(padding);
-                    _streamWriter.Write(padding);
+                    packetWriter.Write(padding);
                 }
 
-                packetData = packetStream.ToArray();
-            }
+                // Get packet data.
+                var packetData = packetStream.ToArray();
 
-            // Write packet data to network stream.
-            _streamWriter.Write(packetData);
+                if (_encryptionAlgorithmStoC != null)
+                {
+                    // Write encrypted packet data to stream.
+                    using (var transform = _encryptionAlgorithmStoC.Algorithm.CreateEncryptor())
+                    {
+                        var cryptoStream = new CryptoStream(_stream, transform, CryptoStreamMode.Write);
+
+                        // Write packet data to crypto stream.
+                        cryptoStream.Write(packetData, 0, packetData.Length);
+                        cryptoStream.FlushFinalBlock();
+                    }
+                }
+                else
+                {
+                    // Write plain packet data to stream.
+                    _stream.Write(packetData, 0, packetData.Length);
+                }
+            }
 
             // Write to debug.
             SshMessage messageId = (SshMessage)(payload[0]);
@@ -691,7 +803,11 @@ namespace WindowsSshServer
             Debug.WriteLine(string.Format("<<< {0}", messageId.ToString()));
 
             // Write MAC (Message Authentication Code), if MAC algorithm has been agreed on.
-            if (_macAlgorithm != null) _streamWriter.Write(ComputeMac(_sendPacketSeqNumber, packetData));
+            if (_macAlgorithmStoC != null) _streamWriter.Write(ComputeMac(_macAlgorithmStoC,
+                _sendPacketSeqNumber, packetLength, paddingLength, payload, padding));
+
+            // Flush stream.
+            _stream.Flush();
 
             // Increment sequence number of next packet to send.
             unchecked { _sendPacketSeqNumber++; }
@@ -699,51 +815,79 @@ namespace WindowsSshServer
 
         protected void ReadPacket()
         {
-            // Read packet length information.
-            uint packetLength = _streamReader.ReadUInt32();
-            byte paddingLength = _streamReader.ReadByte();
-
-            // Read payload data.
-            byte[] rawPayload = new byte[packetLength - 1 - paddingLength];
-
-            _streamReader.Read(rawPayload, 0, rawPayload.Length);
-
-            // Skip bytes of random padding.
-            _streamReader.ReadBytes(paddingLength);
-
-            // Read MAC (Message Authentication Code).
-            byte[] mac = new byte[0];
-
-            if (mac.Length > 0) _streamReader.Read(mac, 0, mac.Length);
-
-            // Check that packet length does not exceed maximum.
-            if (4 + packetLength + mac.Length > _maxPacketLength)
-            {
-                Disconnect(SshDisconnectReason.ProtocolError, "Packet length exceeds maximum.");
-                return;
-            }
-
-            // Decompress and decode payload data.
+            Stream cryptoStream = null;
+            ICryptoTransform cryptoTransform = null;
+            uint packetLength;
+            byte paddingLength;
             byte[] payload;
+            byte[] mac;
 
-            if (_encryptionAlgorithm == null)
-                payload = rawPayload;
-            else
-                payload = _encryptionAlgorithm.Decrypt(rawPayload);
-
-            // Check if currently using MAC algorithm.
-            if (_macAlgorithm != null)
+            try
             {
-                // Verify MAC of received packet.
-                var expectedMac = ComputeMac(_receivePacketSeqNumber, new byte[0]);
-
-                if (!mac.Equals(expectedMac))
+                if (_encryptionAlgorithmCtoS != null)
                 {
-                    // Invalid MAC.
-                    Disconnect(SshDisconnectReason.MacError, string.Format("Invalid MAC for packet #{0}",
-                        _receivePacketSeqNumber));
-                    return;
+                    // Packet is encrypted. Use crypto stream for reading.
+                    cryptoTransform = _encryptionAlgorithmCtoS.Algorithm.CreateDecryptor();
+                    cryptoStream = new CryptoStream(_stream, cryptoTransform, CryptoStreamMode.Read);
                 }
+                else
+                {
+                    // Packet is unencrypted. Use normal network stream for reading.
+                    cryptoStream = _stream;
+                }
+
+                var cryptoStreamReader = new SshStreamReader(cryptoStream);
+
+                // Read packet length information.
+                packetLength = cryptoStreamReader.ReadUInt32();
+                paddingLength = cryptoStreamReader.ReadByte();
+
+                // Read payload data.
+                payload = new byte[packetLength - 1 - paddingLength];
+
+                cryptoStreamReader.Read(payload, 0, payload.Length);
+
+                // Skip bytes of random padding.
+                byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
+
+                // Check if currently using MAC algorithm.
+                if (_macAlgorithmCtoS != null)
+                {
+                    // Read MAC (Message Authentication Code).
+                    // MAC is always unencrypted.
+                    mac = new byte[_macAlgorithmCtoS.DigestLength];
+                    int macBytesRead = ReadCryptoStreamBuffer((CryptoStream)cryptoStream, mac, 0);
+                    _streamReader.Read(mac, macBytesRead, mac.Length - macBytesRead);
+
+                    // Verify MAC of received packet.
+                    var expectedMac = ComputeMac(_macAlgorithmCtoS, _receivePacketSeqNumber, packetLength,
+                        paddingLength, payload, padding);
+
+                    if (!mac.ArrayEquals(expectedMac))
+                    {
+                        // Invalid MAC.
+                        Disconnect(SshDisconnectReason.MacError, string.Format(
+                            "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
+                        throw new SshDisconnectedException();
+                    }
+                }
+                else
+                {
+                    // Set MAC to empty array.
+                    mac = new byte[0];
+                }
+
+                // Check that packet length does not exceed maximum.
+                if (4 + packetLength + mac.Length > _maxPacketLength)
+                {
+                    Disconnect(SshDisconnectReason.ProtocolError, "Packet length exceeds maximum.");
+                    throw new SshDisconnectedException();
+                }
+            }
+            finally
+            {
+                // Dispose crypto objects.
+                if (cryptoTransform != null) cryptoTransform.Dispose();
             }
 
             // Read received message.
@@ -753,7 +897,7 @@ namespace WindowsSshServer
                 {
                     try
                     {
-                        byte messageId = msgReader.ReadByte();
+                        SshMessage messageId = (SshMessage)msgReader.ReadByte();
 
                         // Write to debug.
                         Debug.WriteLine(string.Format(">>> {0}", messageId.ToString()));
@@ -762,35 +906,35 @@ namespace WindowsSshServer
                         switch (messageId)
                         {
                             // Standard messages
-                            case (byte)SshMessage.Disconnect:
+                            case SshMessage.Disconnect:
                                 ReadMsgDisconnect(msgReader);
                                 break;
-                            case (byte)SshMessage.Ignore:
+                            case SshMessage.Ignore:
                                 ReadMsgIgnore(msgReader);
                                 break;
-                            case (byte)SshMessage.Unimplemented:
+                            case SshMessage.Unimplemented:
                                 ReadMsgUnimplemented(msgReader);
                                 break;
-                            case (byte)SshMessage.Debug:
+                            case SshMessage.Debug:
                                 ReadMsgDebug(msgReader);
                                 break;
-                            case (byte)SshMessage.ServiceRequest:
+                            case SshMessage.ServiceRequest:
                                 ReadMsgServiceRequest(msgReader);
                                 break;
-                            case (byte)SshMessage.ServiceAccept:
+                            case SshMessage.ServiceAccept:
                                 ReadMsgServiceAccept(msgReader);
                                 break;
-                            case (byte)SshMessage.KexInit:
+                            case SshMessage.KexInit:
                                 // Store payload of message.
                                 _clientKexInitPayload = payload;
 
                                 ReadMsgKexInit(msgReader);
                                 break;
-                            case (byte)SshMessage.NewKeys:
+                            case SshMessage.NewKeys:
                                 ReadMsgNewKeys(msgReader);
                                 break;
                             // Diffie-Hellman kex messages
-                            case (byte)SshMessageKexDiffieHellman.Init:
+                            case SshMessage.Init:
                                 ReadMsgDhKexInit(msgReader);
                                 break;
                             // Unrecognised message
@@ -804,20 +948,268 @@ namespace WindowsSshServer
                     {
                         // End of stream here means that the received message was found to be malformed.
                         Disconnect(SshDisconnectReason.ProtocolError, "Bad message format.");
-                        return;
-                    }
-                    catch (Exception ex)
-                    {
-                        // Fatal error has occurred.
-                        Disconnect(SshDisconnectReason.ProtocolError, string.Format("Fatal error: {0}",
-                            ex.Message));
-                        return;
+                        throw new SshDisconnectedException();
                     }
                 }
             }
 
             // Increment sequence number of next packet to be received.
             unchecked { _receivePacketSeqNumber++; }
+        }
+
+        protected int ReadCryptoStreamBuffer(CryptoStream stream, byte[] buffer, int offset)
+        {
+            byte[] cryptoStreamBuffer = (byte[])stream.GetType().GetField("_InputBuffer",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(stream);
+            int cryptoStreamBufferIndex = (int)stream.GetType().GetField("_InputBufferIndex",
+                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(stream);
+            int bytesRead = cryptoStreamBuffer.Length - cryptoStreamBufferIndex;
+
+            Buffer.BlockCopy(cryptoStreamBuffer, cryptoStreamBufferIndex, buffer, offset, bytesRead);
+
+            return bytesRead;
+        }
+
+        protected void GenerateKeys(byte[] sharedSecret)
+        {
+            // Set initialization vectors for encryption algorithms.
+            _newEncryptionAlgorithmCtoS.Algorithm.IV = ComputeEncryptionKey(
+                _newEncryptionAlgorithmCtoS.Algorithm.BlockSize / 8, sharedSecret, 'A');
+            _newEncryptionAlgorithmStoC.Algorithm.IV = ComputeEncryptionKey(
+                _newEncryptionAlgorithmStoC.Algorithm.BlockSize / 8, sharedSecret, 'B');
+
+            // Set keys for encryption algorithms.
+            _newEncryptionAlgorithmCtoS.Algorithm.Key = ComputeEncryptionKey(
+                _newEncryptionAlgorithmCtoS.Algorithm.KeySize / 8, sharedSecret, 'C');
+            _newEncryptionAlgorithmStoC.Algorithm.Key = ComputeEncryptionKey(
+                _newEncryptionAlgorithmStoC.Algorithm.KeySize / 8, sharedSecret, 'D');
+
+            // Set keys for MAC algorithms.
+            _newMacAlgorithmCtoS.Algorithm.Key = ComputeEncryptionKey(
+                _newMacAlgorithmCtoS.Algorithm.HashSize / 8, sharedSecret, 'E');
+            _newMacAlgorithmStoC.Algorithm.Key = ComputeEncryptionKey(
+                _newMacAlgorithmStoC.Algorithm.HashSize / 8, sharedSecret, 'F');
+        }
+
+        protected KexAlgorithm ChooseKexAlgorithm(string[] algorithmNames)
+        {
+            KexAlgorithm chosenAlg = null;
+
+            // Pick first algorithm in list that satisfies all conditions.
+            KexAlgorithm alg;
+
+            foreach (var algName in algorithmNames)
+            {
+                // Try to find supported algorithm with current name.
+                alg = this.KexAlgorithms.SingleOrDefault(item => algName == item.Name);
+
+                if (alg != null)
+                {
+                    // Set chosen algorithm.
+                    chosenAlg = alg;
+                    break;
+                }
+            }
+
+            // Check that algorithm was found.
+            if (chosenAlg == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the listed key exchange algorithms are supported.");
+                throw new SshDisconnectedException();
+            }
+
+            return (KexAlgorithm)chosenAlg.Clone();
+        }
+
+        protected PublicKeyAlgorithm ChooseHostKeyAlgorithm(string[] algorithmNames)
+        {
+            PublicKeyAlgorithm chosenAlg = null;
+
+            // Pick first algorithm in list that satisfies all conditions.
+            PublicKeyAlgorithm alg;
+
+            foreach (var algName in algorithmNames)
+            {
+                // Try to find supported algorithm with current name.
+                alg = this.HostKeyAlgorithms.SingleOrDefault(item => algName == item.Name);
+
+                if (alg != null)
+                {
+                    // Set chosen algorithm.
+                    chosenAlg = alg;
+                    break;
+                }
+            }
+
+            // Check that algorithm was found.
+            if (chosenAlg == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the listed server host key algorithms are supported.");
+                throw new SshDisconnectedException();
+            }
+
+            return (PublicKeyAlgorithm)chosenAlg.Clone();
+        }
+
+        protected EncryptionAlgorithm ChooseEncryptionAlgorithm(string[] algorithmNames)
+        {
+            EncryptionAlgorithm chosenAlg = null;
+
+            // Pick first algorithm in list that satisfies all conditions.
+            EncryptionAlgorithm alg;
+
+            foreach (var algName in algorithmNames)
+            {
+                // Try to find supported algorithm with current name.
+                alg = this.EncryptionAlgorithms.SingleOrDefault(item => algName == item.Name);
+
+                if (alg != null)
+                {
+                    // Set chosen algorithm.
+                    chosenAlg = alg;
+                    break;
+                }
+            }
+
+            // Check that algorithm was found.
+            if (chosenAlg == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the listed encryption algorithms are supported.");
+                throw new SshDisconnectedException();
+            }
+
+            return (EncryptionAlgorithm)chosenAlg.Clone();
+        }
+
+        protected MacAlgorithm ChooseMacAlgorithm(string[] algorithmNames)
+        {
+            MacAlgorithm chosenAlg = null;
+
+            // Pick first algorithm in list that satisfies all conditions.
+            MacAlgorithm alg;
+
+            foreach (var algName in algorithmNames)
+            {
+                // Try to find supported algorithm with current name.
+                alg = this.MacAlgorithms.SingleOrDefault(item => algName == item.Name);
+
+                if (alg != null)
+                {
+                    // Set chosen algorithm.
+                    chosenAlg = alg;
+                    break;
+                }
+            }
+
+            // Check that algorithm was found.
+            if (chosenAlg == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the listed MAC algorithms are supported.");
+                throw new SshDisconnectedException();
+            }
+
+            return (MacAlgorithm)chosenAlg.Clone();
+        }
+
+        protected CompressionAlgorithm ChooseCompressionAlgorithm(string[] algorithmNames)
+        {
+            CompressionAlgorithm chosenAlg = null;
+
+            // Pick first algorithm in list that satisfies all conditions.
+            CompressionAlgorithm alg;
+
+            foreach (var algName in algorithmNames)
+            {
+                // Try to find supported algorithm with current name.
+                alg = this.CompressionAlgorithms.SingleOrDefault(item => algName == item.Name);
+
+                if (alg != null)
+                {
+                    // Set chosen algorithm.
+                    chosenAlg = alg;
+                    break;
+                }
+            }
+
+            // Check that algorithm was found.
+            if (chosenAlg == null)
+            {
+                Disconnect(SshDisconnectReason.KeyExchangeFailed,
+                    "None of the listed compression algorithms are supported.");
+                throw new SshDisconnectedException();
+            }
+
+            return (CompressionAlgorithm)chosenAlg.Clone();
+        }
+
+        protected string ChooseLanguage(string[] algorithmNames)
+        {
+            string chosenAlg = null;
+
+            // Pick first algorithm in list that satisfies all conditions.
+            string alg;
+
+            foreach (var algName in algorithmNames)
+            {
+                // Try to find supported algorithm with current name.
+                alg = this.Languages.SingleOrDefault(item => algName == item);
+
+                if (alg != null)
+                {
+                    // Set chosen algorithm.
+                    chosenAlg = alg;
+                    break;
+                }
+            }
+
+            return chosenAlg;
+        }
+
+        protected byte[] ComputeEncryptionKey(int keySize, byte[] sharedSecret, char letter)
+        {
+            byte[] keyBuffer = new byte[keySize];
+            int keyBufferIndex = 0;
+            byte[] currentHash = null;
+            int currentHashLength;
+
+            while (keyBufferIndex < keySize)
+            {
+                using (var hashInputStream = new MemoryStream())
+                {
+                    using (var hashInputWriter = new SshStreamWriter(hashInputStream))
+                    {
+                        // Write input data to hash stream.
+                        hashInputWriter.WriteMPint(sharedSecret);
+                        hashInputWriter.Write(_exchangeHash);
+
+                        if (currentHash == null)
+                        {
+                            hashInputWriter.Write((byte)letter);
+                            hashInputWriter.Write(_sessionId);
+                        }
+                        else
+                        {
+                            hashInputWriter.Write(currentHash);
+                        }
+                    }
+
+                    // Compute hash of input data.
+                    currentHash = _kexAlgorithm.ComputeHash(hashInputStream.ToArray());
+                }
+
+                // Copy current hash output to key buffer.
+                currentHashLength = Math.Min(currentHash.Length, keySize - keyBufferIndex);
+                Buffer.BlockCopy(currentHash, 0, keyBuffer, keyBufferIndex, currentHashLength);
+
+                // Advance key buffer index.
+                keyBufferIndex += currentHashLength;
+            }
+
+            return keyBuffer;
         }
 
         protected byte[] ComputeExchangeHash(byte[] hostKey, byte[] clientExchangeValue,
@@ -827,7 +1219,7 @@ namespace WindowsSshServer
             {
                 using (var hashInputWriter = new SshStreamWriter(hashInputStream))
                 {
-                    // Write input data to hash stream.
+                    // Write kex parameters to stream.
                     hashInputWriter.Write(_clientIdString);
                     hashInputWriter.Write(_serverIdString);
                     hashInputWriter.WriteByteString(_clientKexInitPayload);
@@ -843,32 +1235,72 @@ namespace WindowsSshServer
             }
         }
 
-        protected byte[] ComputeMac(uint packetSequenceNumber, byte[] unencryptedPacket)
+        protected byte[] ComputeMac(MacAlgorithm algorithm, uint packetSequenceNumber, uint packetLength,
+            byte paddingLength, byte[] payload, byte[] padding)
         {
-            // Create input data from packet sequency number and unencrypted packet data.
-            byte[] inputData = new byte[unencryptedPacket.Length + 4];
+            using (var macInputStream = new MemoryStream())
+            {
+                using (var macInputWriter = new SshStreamWriter(macInputStream))
+                {
+                    // Write sequence number to stream.
+                    macInputWriter.Write(packetSequenceNumber);
 
-            inputData[0] = (byte)((packetSequenceNumber & 0xFF000000) >> 24);
-            inputData[1] = (byte)((packetSequenceNumber & 0x00FF0000) >> 16);
-            inputData[2] = (byte)((packetSequenceNumber & 0x0000FF00) >> 8);
-            inputData[3] = (byte)(packetSequenceNumber & 0x000000FF);
+                    // Write packet data to stream.
+                    macInputWriter.Write(packetLength);
+                    macInputWriter.Write(paddingLength);
+                    macInputWriter.Write(payload);
+                    macInputWriter.Write(padding);
+                }
 
-            Buffer.BlockCopy(unencryptedPacket, 0, inputData, 4, unencryptedPacket.Length);
-
-            // Return MAC data.
-            return _macAlgorithm.ComputeHash(inputData);
+                // Return MAC data.
+                return algorithm.ComputeHash(macInputStream.ToArray());
+            }
         }
 
-        protected virtual void OnConnected()
+        //protected byte[] ComputeMac(MacAlgorithm algorithm, uint packetSequenceNumber,
+        //    byte[] unencryptedPacket)
+        //{
+        //    // Create input data from packet sequence number and unencrypted packet data.
+        //    byte[] inputData = new byte[unencryptedPacket.Length + 4];
+
+        //    inputData[0] = (byte)((packetSequenceNumber & 0xFF000000) >> 24);
+        //    inputData[1] = (byte)((packetSequenceNumber & 0x00FF0000) >> 16);
+        //    inputData[2] = (byte)((packetSequenceNumber & 0x0000FF00) >> 8);
+        //    inputData[3] = (byte)(packetSequenceNumber & 0x000000FF);
+
+        //    Buffer.BlockCopy(unencryptedPacket, 0, inputData, 4, unencryptedPacket.Length);
+
+        //    // Return MAC data.
+        //    return algorithm.ComputeHash(inputData);
+        //}
+
+        protected void FatalErrorOccurred(Exception ex)
         {
-            // Raise event: client has connected.
+            // Disconnect with reason.
+            Disconnect(SshDisconnectReason.ProtocolError, string.Format("Fatal error: {0}", ex.Message));
+
+            OnError(new SshErrorEventArgs(ex is SshException ? (SshException)ex
+                : new SshException("A fatal error has occurred.", ex)));
+        }
+
+        protected virtual void OnConnected(EventArgs e)
+        {
             if (Connected != null) Connected(this, new EventArgs());
         }
 
-        protected virtual void OnDisconnected(bool disconnectedRemotely)
+        protected virtual void OnDisconnected(SshDisconnectedEventArgs e)
         {
-            // Raise event: client has disconnected.
-            if (Disconnected != null) Disconnected(this, new DisconnectedEventArgs(disconnectedRemotely));
+            if (Disconnected != null) Disconnected(this, e);
+        }
+
+        protected virtual void OnError(SshErrorEventArgs e)
+        {
+            if (Error != null) Error(this, new EventArgs());
+        }
+
+        protected virtual void OnDebugMessageReceived(SshDebugMessageReceivedEventArgs e)
+        {
+            if (DebugMessageReceived != null) DebugMessageReceived(this, e);
         }
 
         private void ReceiveData()
@@ -896,18 +1328,22 @@ namespace WindowsSshServer
                 {
                     Disconnect(SshDisconnectReason.ProtocolVersionNotSupported,
                         "This server only supports SSH v2.0.");
-                    return;
+                    throw new SshDisconnectedException();
                 }
 
                 // Send kex initialization message.
                 SendMsgKexInit();
 
-                // Read packets from network stream until connection is closed.
+                // Read packets from network stream until end of stream is reached.
                 while (true)
                 {
                     // Read next packet.
                     ReadPacket();
                 }
+            }
+            catch (SshDisconnectedException)
+            {
+                // Ignore.
             }
             catch (EndOfStreamException)
             {
@@ -916,33 +1352,38 @@ namespace WindowsSshServer
             }
             catch (IOException exIo)
             {
-                try
+                // Check if socket exception was root cause.
+                if (exIo.InnerException is SocketException)
                 {
-                    // Check if socket exception was root cause.
-                    if (exIo.InnerException is SocketException)
-                    {
-                        var exSocket = (SocketException)exIo.InnerException;
+                    var exSocket = (SocketException)exIo.InnerException;
 
-                        if (exSocket.SocketErrorCode == SocketError.ConnectionAborted)
-                            Disconnect(false);
-                        else if (exSocket.SocketErrorCode == SocketError.ConnectionReset)
-                            Disconnect(true);
-                        else
-                            throw exSocket;
-                    }
+                    if (exSocket.SocketErrorCode == SocketError.ConnectionAborted)
+                        Disconnect(false);
+                    else if (exSocket.SocketErrorCode == SocketError.ConnectionReset)
+                        Disconnect(true);
                     else
-                    {
-                        throw exIo;
-                    }
+                        // Fatal error has occurred.
+                        FatalErrorOccurred(exSocket);
                 }
-                catch (Exception ex)
+                else
                 {
-                    // Raise event: error occurred.
-                    if (Error != null) Error(this, new ErrorEventArgs(ex));
+                    // Fatal error has occurred.
+                    FatalErrorOccurred(exIo);
                 }
+            }
+            catch (SshException exSsh)
+            {
+                // Fatal error has occurred.
+                FatalErrorOccurred(exSsh);
             }
             catch (ThreadAbortException)
             {
+                // Thread has been aborted.
+            }
+            catch (Exception ex)
+            {
+                // Fatal error has occurred.
+                FatalErrorOccurred(ex);
             }
             finally
             {
@@ -950,9 +1391,9 @@ namespace WindowsSshServer
         }
     }
 
-    public class DisconnectedEventArgs : EventArgs
+    public class SshDisconnectedEventArgs : EventArgs
     {
-        public DisconnectedEventArgs(bool disconnectedRemotely)
+        public SshDisconnectedEventArgs(bool disconnectedRemotely)
         {
             this.DisconnectedRemotely = disconnectedRemotely;
         }
@@ -964,14 +1405,42 @@ namespace WindowsSshServer
         }
     }
 
-    public class ErrorEventArgs : EventArgs
+    public class SshErrorEventArgs : EventArgs
     {
-        public ErrorEventArgs(Exception exception)
+        public SshErrorEventArgs(SshException exception)
         {
             this.Exception = exception;
         }
 
-        public Exception Exception
+        public SshException Exception
+        {
+            get;
+            protected set;
+        }
+    }
+
+    public class SshDebugMessageReceivedEventArgs : EventArgs
+    {
+        public SshDebugMessageReceivedEventArgs(bool alwaysDisplay, string message, string language)
+        {
+            this.AlwaysDisplay = alwaysDisplay;
+            this.Message = message;
+            this.Language = language;
+        }
+
+        public bool AlwaysDisplay
+        {
+            get;
+            protected set;
+        }
+
+        public string Message
+        {
+            get;
+            protected set;
+        }
+
+        public string Language
         {
             get;
             protected set;
@@ -1006,11 +1475,7 @@ namespace WindowsSshServer
         ServiceRequest = 5,
         ServiceAccept = 6,
         KexInit = 20,
-        NewKeys = 21
-    }
-
-    public enum SshMessageKexDiffieHellman : byte
-    {
+        NewKeys = 21,
         Init = 30,
         Reply = 31
     }

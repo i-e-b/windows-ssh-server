@@ -7,11 +7,11 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshRsa : PublicKeyAlgorithm
+    public class SshRsa : PublicKeyAlgorithm
     {
         protected new RSACryptoServiceProvider _algorithm; // Algorithm to use.
 
-        internal SshRsa()
+        public SshRsa()
             : base()
         {
             _algorithm = new RSACryptoServiceProvider();
@@ -45,7 +45,7 @@ namespace WindowsSshServer.Algorithms
             }
         }
 
-        public override byte[] CreateKeyData()
+        public override byte[] CreateKeyAndCertificatesData()
         {
             using (var dataStream = new MemoryStream())
             {
@@ -72,6 +72,11 @@ namespace WindowsSshServer.Algorithms
             {
                 return _algorithm.SignHash(sha1.ComputeHash(hashData), hashAlgOid);
             }
+        }
+
+        public override object Clone()
+        {
+            return new SshRsa();
         }
     }
 }

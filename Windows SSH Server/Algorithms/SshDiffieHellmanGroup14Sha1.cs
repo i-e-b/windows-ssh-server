@@ -8,11 +8,11 @@ using Org.Mentalis.Security.Cryptography;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshDiffieHellmanGroup14Sha1 : KexAlgorithm
+    public class SshDiffieHellmanGroup14Sha1 : KexAlgorithm
     {
         protected DiffieHellman _exchangeAlgorithm; // Exchange algorithm to use.
 
-        internal SshDiffieHellmanGroup14Sha1()
+        public SshDiffieHellmanGroup14Sha1()
             : base()
         {
             _exchangeAlgorithm = new DiffieHellmanManaged(2048, 0, DHKeyGeneration.Static);
@@ -37,6 +37,11 @@ namespace WindowsSshServer.Algorithms
         public override byte[] DecryptKeyExchange(byte[] exchangeData)
         {
             return _exchangeAlgorithm.DecryptKeyExchange(exchangeData);
+        }
+
+        public override object Clone()
+        {
+            return new SshDiffieHellmanGroup14Sha1();
         }
     }
 }

@@ -6,9 +6,9 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshHmacSha1_96 : SshHmacSha1
+    public class SshHmacSha1_96 : SshHmacSha1
     {
-        internal SshHmacSha1_96()
+        public SshHmacSha1_96()
             : base()
         {
         }
@@ -18,12 +18,22 @@ namespace WindowsSshServer.Algorithms
             get { return "hmac-sha1-96"; }
         }
 
+        public override int DigestLength
+        {
+            get { return 12; }
+        }
+
         public override byte[] ComputeHash(byte[] input)
         {
             var hash = base.ComputeHash(input);
-            Array.Resize(ref hash, 12); // 12 bytes = 96 bits
+            Array.Resize(ref hash, this.DigestLength); // 12 bytes = 96 bits
 
             return hash;
+        }
+
+        public override object Clone()
+        {
+            return new SshHmacSha1_96();
         }
     }
 }

@@ -42,33 +42,6 @@ namespace WindowsSshServer
             Write(string.Join(",", nameList));
         }
 
-        //public void WriteMPint(int value)
-        //{
-        //    var strBuilder = new StringBuilder();
-
-        //    // Write bytes of integer (as many as are needed).
-        //    byte curByte = 0;
-        //    byte lastByte;
-
-        //    while (true)
-        //    {
-        //        lastByte = curByte;
-        //        curByte = (byte)(value & 0xFF);
-        //        if (curByte == 0) break;
-
-        //        strBuilder.Insert(0, curByte);
-        //        value >>= 1;
-        //    }
-
-        //    // Insert null byte if MSB of integer is high.
-        //    if ((lastByte & 0x80) != 0) strBuilder.Insert(0, (byte)0);
-
-        //    // Prepend length of string.
-        //    strBuilder.Append(strBuilder.Length);
-
-        //    Write(strBuilder.ToString());
-        //}
-
         public void WriteByteString(byte[] value)
         {
             Write((uint)value.Length);

@@ -7,7 +7,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    public abstract class PublicKeyAlgorithm : IDisposable
+    public abstract class PublicKeyAlgorithm : IDisposable, ICloneable
     {
         protected AsymmetricAlgorithm _algorithm; // Algorithm to use.
 
@@ -20,6 +20,12 @@ namespace WindowsSshServer
         ~PublicKeyAlgorithm()
         {
             Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -36,12 +42,6 @@ namespace WindowsSshServer
             }
 
             _isDisposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public abstract string Name
@@ -76,7 +76,7 @@ namespace WindowsSshServer
 
         public abstract void ExportKey(Stream stream);
 
-        public abstract byte[] CreateKeyData();
+        public abstract byte[] CreateKeyAndCertificatesData();
 
         public byte[] CreateSignatureData(byte[] hashData)
         {
@@ -97,5 +97,7 @@ namespace WindowsSshServer
         }
 
         public abstract byte[] SignHash(byte[] hashData);
+
+        public abstract object Clone();
     }
 }

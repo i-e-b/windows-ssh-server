@@ -1,22 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
+using System.Net;
+using System.Net.Sockets;
 using System.Text;
 
 namespace WindowsSshServer
 {
-    public abstract class MacAlgorithm : IDisposable, ICloneable
+    public class TcpConnection : IConnection
     {
-        protected HMAC _algorithm;        // Algorithm to use.
+        protected TcpClient _tcpClient;   // Client TCP connection.
 
         private bool _isDisposed = false; // True if object has been disposed.
 
-        public MacAlgorithm()
+        public TcpConnection(TcpClient tcpClient)
         {
+            _tcpClient = tcpClient;
         }
 
-        ~MacAlgorithm()
+        ~TcpConnection()
         {
             Dispose(false);
         }
@@ -27,14 +30,13 @@ namespace WindowsSshServer
             GC.SuppressFinalize(this);
         }
 
-        protected virtual void Dispose(bool disposing)
+        protected void Dispose(bool disposing)
         {
             if (!_isDisposed)
             {
                 if (disposing)
                 {
                     // Dispose managed resources.
-                    if (_algorithm != null) _algorithm.Clear();
                 }
 
                 // Dispose unmanaged resources.
@@ -43,26 +45,19 @@ namespace WindowsSshServer
             _isDisposed = true;
         }
 
-        public abstract string Name
+        public Stream GetStream()
         {
-            get;
+            return _tcpClient.GetStream();
         }
 
-        public abstract int DigestLength
+        public void Disconnect(bool remotely)
         {
-            get;
+            // Close network objects.
+            if (_tcpClient != null)
+            {
+                _tcpClient.Close();
+                _tcpClient = null;
+            }
         }
-
-        public HMAC Algorithm
-        {
-            get { return _algorithm; }
-        }
-
-        public virtual byte[] ComputeHash(byte[] input)
-        {
-            return _algorithm.ComputeHash(input);
-        }
-
-        public abstract object Clone();
     }
 }

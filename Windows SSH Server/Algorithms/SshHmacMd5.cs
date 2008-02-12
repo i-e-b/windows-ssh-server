@@ -6,9 +6,9 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshHmacMd5 : MacAlgorithm
+    public class SshHmacMd5 : MacAlgorithm
     {
-        internal SshHmacMd5()
+        public SshHmacMd5()
             : base()
         {
             _algorithm = new HMACMD5();
@@ -17,6 +17,16 @@ namespace WindowsSshServer.Algorithms
         public override string Name
         {
             get { return "hmac-md5"; }
+        }
+
+        public override int DigestLength
+        {
+            get { return _algorithm.HashSize / 8; }
+        }
+
+        public override object Clone()
+        {
+            return new SshHmacMd5();
         }
     }
 }

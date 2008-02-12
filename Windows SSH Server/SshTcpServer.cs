@@ -9,18 +9,18 @@ namespace WindowsSshServer
 {
     public sealed class SshTcpServer : IDisposable
     {
-        private TcpListener _tcpListener;    // Listens for TCP connections from clients.
-        private List<SshTcpClient> _clients; // List of connected clients.
+        private TcpListener _tcpListener; // Listens for TCP connections from clients.
+        private List<SshClient> _clients; // List of connected clients.
 
-        private object _listenerLock;        // Lock for TCP listener.
+        private object _listenerLock;     // Lock for TCP listener.
 
-        private bool _isDisposed = false;    // True if object has been disposed.
+        private bool _isDisposed = false; // True if object has been disposed.
 
         public SshTcpServer()
         {
             _listenerLock = new object();
 
-            _clients = new List<SshTcpClient>();
+            _clients = new List<SshClient>();
         }
 
         ~SshTcpServer()
@@ -28,9 +28,15 @@ namespace WindowsSshServer
             Dispose(false);
         }
 
-        public List<SshTcpClient> Clients
+        public List<SshClient> Clients
         {
             get { return _clients; }
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         private void Dispose(bool disposing)
@@ -50,12 +56,6 @@ namespace WindowsSshServer
             }
 
             _isDisposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public bool IsRunning
@@ -129,7 +129,7 @@ namespace WindowsSshServer
                 _tcpListener.BeginAcceptTcpClient(new AsyncCallback(AcceptTcpClient), _tcpListener);
 
                 // Add new client to list.
-                var sshClient = new SshTcpClient(tcpClient);
+                var sshClient = new SshConsoleClient(new TcpConnection(tcpClient));
 
                 sshClient.Connected += client_Connected;
                 sshClient.Disconnected += client_Disconnected;
@@ -146,7 +146,7 @@ namespace WindowsSshServer
 
         private void client_Disconnected(object sender, EventArgs e)
         {
-            SshTcpClient client = (SshTcpClient)sender;
+            SshClient client = (SshClient)sender;
 
             // Remove client from list.
             _clients.Remove(client);

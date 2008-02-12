@@ -6,7 +6,7 @@ using System.Text;
 
 namespace WindowsSshServer
 {
-    public abstract class KexAlgorithm
+    public abstract class KexAlgorithm : IDisposable, ICloneable
     {
         protected HashAlgorithm _hashAlgorithm; // Algorithm to use for hashing.
 
@@ -19,6 +19,12 @@ namespace WindowsSshServer
         ~KexAlgorithm()
         {
             Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
 
         protected virtual void Dispose(bool disposing)
@@ -35,12 +41,6 @@ namespace WindowsSshServer
             }
 
             _isDisposed = true;
-        }
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
         }
 
         public abstract string Name
@@ -66,5 +66,7 @@ namespace WindowsSshServer
         {
             return _hashAlgorithm.ComputeHash(input);
         }
+
+        public abstract object Clone();
     }
 }

@@ -6,9 +6,9 @@ using System.Text;
 
 namespace WindowsSshServer.Algorithms
 {
-    internal class SshAes256Cbc : EncryptionAlgorithm
+    public class SshAes256Cbc : EncryptionAlgorithm
     {
-        internal SshAes256Cbc()
+        public SshAes256Cbc()
             : base()
         {
             _algorithm = new AesCryptoServiceProvider();
@@ -19,6 +19,11 @@ namespace WindowsSshServer.Algorithms
         public override string Name
         {
             get { return "aes256-cbc"; }
+        }
+
+        public override object Clone()
+        {
+            return new SshAes256Cbc();
         }
     }
 }

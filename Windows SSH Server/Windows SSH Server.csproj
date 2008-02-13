@@ -71,6 +71,7 @@
     <Compile Include="CachedStream.cs" />
     <Compile Include="SshConnectionService.cs" />
     <Compile Include="IConnection.cs" />
+    <Compile Include="SshPacket.cs" />
     <Compile Include="SshService.cs" />
     <Compile Include="SshAuthenticationService.cs" />
     <Compile Include="SshException.cs" />

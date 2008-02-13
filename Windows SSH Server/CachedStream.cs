@@ -37,6 +37,25 @@ namespace WindowsSshServer
             }
         }
 
+        public byte[] GetBufferStart(int index, int count)
+        {
+            byte[] returnBuffer = new byte[count];
+            byte[] buffer = GetBuffer(index);
+
+            Buffer.BlockCopy(buffer, 0, returnBuffer, 0, returnBuffer.Length);
+            return returnBuffer;
+        }
+
+        public byte[] GetBufferEnd(int index, int count)
+        {
+            byte[] returnBuffer = new byte[count];
+            byte[] buffer = GetBuffer(index);
+
+            Buffer.BlockCopy(buffer, buffer.Length - returnBuffer.Length, returnBuffer, 0, 
+                returnBuffer.Length);
+            return returnBuffer;
+        }
+
         public byte[] GetBuffer(int index)
         {
             return _buffers[index];

@@ -364,7 +364,7 @@ namespace WindowsSshServer
                 _newCompAlgStoC.Dispose();
                 _newCompAlgStoC = null;
             }
-
+            
             // Disconnect connection object.
             if (_connection != null) _connection.Disconnect(remotely);
 
@@ -596,7 +596,7 @@ namespace WindowsSshServer
                     // Hack: recreate decryptor with correct IV.
                     _cryptoTransformCtoS.Dispose();
                     _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
-                        cachedStream.GetBuffer(0));
+                        cachedStream.GetBufferEnd(0, _cryptoTransformCtoS.InputBlockSize));
                 }
 
                 // Verify MAC of received packet.
@@ -957,7 +957,7 @@ namespace WindowsSshServer
             {
                 // Service was not found.
                 Disconnect(SshDisconnectReason.ServiceNotAvailable, string.Format(
-                    "The service with name {0} is not supported by this server."));
+                    "The service with name {0} is not supported by this server.", serviceName));
                 throw new SshDisconnectedException();
             }
         }

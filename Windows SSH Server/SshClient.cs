@@ -391,7 +391,7 @@ namespace WindowsSshServer
             this.MacAlgorithms.Add(new SshHmacMd5());
             this.MacAlgorithms.Add(new SshHmacMd5_96());
 
-            //this.CompressionAlgorithms.Add(new SshZlibCompression());
+            this.CompressionAlgorithms.Add(new SshZlibCompression());
             this.CompressionAlgorithms.Add(new SshNoCompression());
         }
 
@@ -456,6 +456,9 @@ namespace WindowsSshServer
             byte blockSize = (byte)(_encAlgStoC == null ? 8 :
                _encAlgStoC.Algorithm.BlockSize / 8);
 
+            // Compress payload data.
+            byte[] compressedPayload = (_compAlgStoC == null ? payload : _compAlgStoC.Compress(payload));
+
             // Calculate random number of extra blocks of padding to add.
             int maxNumExtraPaddingBlocks = (256 - blockSize) / blockSize;
             int numExtraPaddingBlocks = _rng.GetNumber(0, maxNumExtraPaddingBlocks);
@@ -464,10 +467,10 @@ namespace WindowsSshServer
             // Packet size (minus MAC) must be multiple of 8 or cipher block size (whichever is larger).
             // Minimum packet size (minus MAC) is 16.
             // Padding length must be between 4 and 255 bytes.
-            byte paddingLength = (byte)(blockSize - ((5 + payload.Length) % blockSize)
+            byte paddingLength = (byte)(blockSize - ((5 + compressedPayload.Length) % blockSize)
                 + numExtraPaddingBlocks * blockSize);
             if (paddingLength < 4) paddingLength += blockSize;
-            uint packetLength = (uint)payload.Length + paddingLength + 1;
+            uint packetLength = (uint)compressedPayload.Length + paddingLength + 1;
             byte[] padding;
 
             if (packetLength < 12)
@@ -491,7 +494,7 @@ namespace WindowsSshServer
                         packetWriter.Write(paddingLength);
 
                         // Write payload data.
-                        packetWriter.Write(payload);
+                        packetWriter.Write(compressedPayload);
 
                         // Write bytes of random padding.
                         padding = new byte[paddingLength];
@@ -527,7 +530,7 @@ namespace WindowsSshServer
                 if (_macAlgStoC != null)
                 {
                     var mac = ComputeMac(_macAlgStoC, _sendPacketSeqNumber, packetLength, paddingLength,
-                        payload, padding);
+                        compressedPayload, padding);
                     tempStream.Write(mac, 0, mac.Length);
                 }
 
@@ -545,7 +548,7 @@ namespace WindowsSshServer
             Stream cryptoStream = null;
             uint packetLength;
             byte paddingLength;
-            byte[] payload;
+            byte[] compressedPayload;
             byte[] mac;
 
             if (_encAlgCtoS != null)
@@ -575,9 +578,9 @@ namespace WindowsSshServer
             }
 
             // Read payload data.
-            payload = new byte[packetLength - 1 - paddingLength];
+            compressedPayload = new byte[packetLength - 1 - paddingLength];
 
-            cryptoStreamReader.Read(payload, 0, payload.Length);
+            cryptoStreamReader.Read(compressedPayload, 0, compressedPayload.Length);
 
             // Skip bytes of random padding.
             byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
@@ -601,7 +604,7 @@ namespace WindowsSshServer
 
                 // Verify MAC of received packet.
                 var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
-                    paddingLength, payload, padding);
+                    paddingLength, compressedPayload, padding);
 
                 if (!mac.ArrayEquals(expectedMac))
                 {
@@ -623,6 +626,10 @@ namespace WindowsSshServer
                 Disconnect(SshDisconnectReason.ProtocolError, "Packet length exceeds maximum.");
                 throw new SshDisconnectedException();
             }
+
+            // Decompress payload data.
+            byte[] payload = (_compAlgCtoS == null ? compressedPayload
+                : _compAlgCtoS.Decompress(compressedPayload));
 
             // Write to debug.
             Debug.WriteLine(string.Format(">>> {0}", (SshMessage)payload[0]));

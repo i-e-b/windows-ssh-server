@@ -12,6 +12,8 @@
     <AssemblyName>Windows SSH Server</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>WindowsSshServer.pfx</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -31,14 +33,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="DiffieHellman, Version=1.0.0.36709, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\DiffieHellman.dll</HintPath>
-    </Reference>
-    <Reference Include="DotZLib, Version=1.0.2964.27685, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\DotZLib.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
       <RequiredTargetFramework>3.5</RequiredTargetFramework>
@@ -54,43 +48,9 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
-    <Reference Include="Twofish, Version=1.0.2965.36651, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Twofish.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Algorithms\SshTwofish256Cbc.cs" />
-    <Compile Include="Algorithms\SshTwofish128Cbc.cs" />
-    <Compile Include="Algorithms\SshTwofish192Cbc.cs" />
-    <Compile Include="Algorithms\SshZlibCompression.cs" />
-    <Compile Include="Algorithms\SshNoCompression.cs" />
-    <Compile Include="Algorithms\SshAes256Cbc.cs" />
-    <Compile Include="Algorithms\SshAes128Cbc.cs" />
-    <Compile Include="Algorithms\SshAes192Cbc.cs" />
-    <Compile Include="Algorithms\SshHmacMd5_96.cs" />
-    <Compile Include="Algorithms\SshHmacMd5.cs" />
-    <Compile Include="Algorithms\SshHmacSha1_96.cs" />
-    <Compile Include="Algorithms\SshHmacSha1.cs" />
-    <Compile Include="Algorithms\SshTripleDesCbc.cs" />
-    <Compile Include="Algorithms\SshRsa.cs" />
-    <Compile Include="Algorithms\SshDss.cs" />
-    <Compile Include="Algorithms\SshDiffieHellmanGroup14Sha1.cs" />
-    <Compile Include="Algorithms\SshDiffieHellmanGroup1Sha1.cs" />
-    <Compile Include="BasicExtensions.cs" />
-    <Compile Include="CompressionAlgorithm.cs" />
-    <Compile Include="CachedStream.cs" />
-    <Compile Include="MeasuredStream.cs" />
-    <Compile Include="SshConnectionService.cs" />
-    <Compile Include="IConnection.cs" />
-    <Compile Include="SshService.cs" />
-    <Compile Include="SshAuthenticationService.cs" />
-    <Compile Include="SshException.cs" />
-    <Compile Include="CryptoExtensions.cs" />
-    <Compile Include="MacAlgorithm.cs" />
-    <Compile Include="EncryptionAlgorithm.cs" />
-    <Compile Include="PublicKeyAlgorithm.cs" />
-    <Compile Include="KexAlgorithm.cs" />
+    <Compile Include="ConsoleHelper.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -113,34 +73,32 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
-    <None Include="Keys\dss-default.key" />
-    <None Include="Keys\rsa-default.key" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
+    <None Include="WindowsSshServer.pfx" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
-    <Compile Include="SshClient.cs" />
-    <Compile Include="DisconnectedException.cs" />
-    <Compile Include="SshTcpServer.cs" />
-    <Compile Include="SshStreamReader.cs" />
-    <Compile Include="SshStreamWriter.cs" />
     <Compile Include="SshConsoleClient.cs" />
-    <Compile Include="TcpConnection.cs" />
+    <Compile Include="SshTcpServer.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConsoleHook.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="Info\Public Key Formats.txt" />
-    <Content Include="Info\SSH_MSG_KEXINIT_0.txt" />
     <Content Include="zlib1.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\SSH.NET\SSH.NET.csproj">
+      <Project>{B391E414-FEBF-4A0C-970B-5A4596ED597A}</Project>
+      <Name>SSH.NET</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

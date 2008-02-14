@@ -1,0 +1,71 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Twofish</name>
+    </assembly>
+    <members>
+        <member name="T:TwofishLib.TwofishEncryption">
+            <summary>
+            Summary description for TwofishEncryption.
+            </summary>
+        </member>
+        <member name="T:TwofishLib.TwofishBase">
+            <summary>
+            Summary description for TwofishBase.
+            </summary>
+        </member>
+        <member name="M:TwofishLib.TwofishEncryption.TransformBlock(System.Byte[],System.Int32,System.Int32,System.Byte[],System.Int32)">
+            <summary>
+            Transform a block depending on whether we are encrypting or decrypting
+            </summary>
+            <param name="inputBuffer"></param>
+            <param name="inputOffset"></param>
+            <param name="inputCount"></param>
+            <param name="outputBuffer"></param>
+            <param name="outputOffset"></param>
+            <returns></returns>
+        </member>
+        <member name="T:TwofishLib.Twofish">
+            <summary>
+            Provides an implementation of the Twofish symmetric algorithm.
+            </summary>
+            <remarks>
+            More information about the algorithm can be found at http://www.counterpane.com/twofish.html.
+            </remarks>
+        </member>
+        <member name="M:TwofishLib.Twofish.#ctor">
+            <summary>
+            This is the Twofish constructor.
+            </summary>
+        </member>
+        <member name="M:TwofishLib.Twofish.CreateEncryptor(System.Byte[],System.Byte[])">
+            <summary>
+            Creates an object that supports ICryptoTransform that can be used to encrypt data using the Twofish encryption algorithm.
+            </summary>
+            <param name="key">A byte array that contains a key. The length of this key should be equal to the KeySize property</param>
+            <param name="iv">A byte array that contains an initialization vector. The length of this IV should be equal to the BlockSize property</param>
+        </member>
+        <member name="M:TwofishLib.Twofish.CreateDecryptor(System.Byte[],System.Byte[])">
+            <summary>
+            Creates an object that supports ICryptoTransform that can be used to decrypt data using the Twofish encryption algorithm.
+            </summary>
+            <param name="key">A byte array that contains a key. The length of this key should be equal to the KeySize property</param>
+            <param name="iv">A byte array that contains an initialization vector. The length of this IV should be equal to the BlockSize property</param>
+        </member>
+        <member name="M:TwofishLib.Twofish.GenerateIV">
+            <summary>
+            Generates a random initialization Vector (IV). 
+            </summary>
+        </member>
+        <member name="M:TwofishLib.Twofish.GenerateKey">
+            <summary>
+            Generates a random Key. This is only really useful in testing scenarios.
+            </summary>
+        </member>
+        <member name="P:TwofishLib.Twofish.Mode">
+            <summary>
+            Override the Set method on this property so that we only support CBC and EBC
+            </summary>
+        </member>
+    </members>
+</doc>

@@ -5,10 +5,12 @@ using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 
-using System.Reflection;
+using SshDotNet;
+using SshDotNet.Algorithms;
 
 namespace WindowsSshServer
 {
@@ -47,7 +49,8 @@ namespace WindowsSshServer
         {
             if (e.AuthMethod == AuthenticationMethod.None) return;
 
-            e.Result = AuthenticationResult.PasswordExpired;
+            e.Result = AuthenticationResult.Success;
+            //e.Result = AuthenticationResult.PasswordExpired;
         }
 
         private void authService_ChangePassword(object sender, ChangePasswordEventArgs e)
@@ -77,8 +80,8 @@ namespace WindowsSshServer
 
             if (!Directory.Exists(keysDir)) Directory.CreateDirectory(keysDir);
 
-            var dssAlg = new Algorithms.SshDss();
-            var rsaAlg = new Algorithms.SshRsa();
+            var dssAlg = new SshDss();
+            var rsaAlg = new SshRsa();
 
             dssAlg.ExportKey(keysDir + @"dss-default.key");
             rsaAlg.ExportKey(keysDir + @"rsa-default.key");
@@ -91,11 +94,6 @@ namespace WindowsSshServer
 
             statusLabel.Text = _server.IsRunning ? "Running" : "Stopped";
             clientCountLabel.Text = string.Format("{0} clients", _server.Clients.Count);
-
-            if (_server.Clients.Count > 0)
-            {
-                this.Text = _server.Clients[0].BytesTransmittedSinceLastKex.ToString();
-            }
         }
     }
 }

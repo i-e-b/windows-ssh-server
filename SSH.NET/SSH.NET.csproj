@@ -1,0 +1,119 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="3.5" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>9.0.21022</ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{B391E414-FEBF-4A0C-970B-5A4596ED597A}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>SshDotNet</RootNamespace>
+    <AssemblyName>SSH.NET</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>SSH.NET.pfx</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="DiffieHellman, Version=1.0.0.31658, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\DiffieHellman.dll</HintPath>
+    </Reference>
+    <Reference Include="DotZLib, Version=1.0.2965.34405, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\DotZLib.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Xml.Linq">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions">
+      <RequiredTargetFramework>3.5</RequiredTargetFramework>
+    </Reference>
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+    <Reference Include="Twofish, Version=1.0.2965.36651, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Twofish.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Algorithms\SshAes128Cbc.cs" />
+    <Compile Include="Algorithms\SshAes192Cbc.cs" />
+    <Compile Include="Algorithms\SshAes256Cbc.cs" />
+    <Compile Include="Algorithms\SshDiffieHellmanGroup14Sha1.cs" />
+    <Compile Include="Algorithms\SshDiffieHellmanGroup1Sha1.cs" />
+    <Compile Include="Algorithms\SshDss.cs" />
+    <Compile Include="Algorithms\SshHmacMd5.cs" />
+    <Compile Include="Algorithms\SshHmacMd5_96.cs" />
+    <Compile Include="Algorithms\SshHmacSha1.cs" />
+    <Compile Include="Algorithms\SshHmacSha1_96.cs" />
+    <Compile Include="Algorithms\SshNoCompression.cs" />
+    <Compile Include="Algorithms\SshRsa.cs" />
+    <Compile Include="Algorithms\SshTripleDesCbc.cs" />
+    <Compile Include="Algorithms\SshTwofish128Cbc.cs" />
+    <Compile Include="Algorithms\SshTwofish192Cbc.cs" />
+    <Compile Include="Algorithms\SshTwofish256Cbc.cs" />
+    <Compile Include="Algorithms\SshZlibCompression.cs" />
+    <Compile Include="BasicExtensions.cs" />
+    <Compile Include="CachedStream.cs" />
+    <Compile Include="CompressionAlgorithm.cs" />
+    <Compile Include="CryptoExtensions.cs" />
+    <Compile Include="DisconnectedException.cs" />
+    <Compile Include="EncryptionAlgorithm.cs" />
+    <Compile Include="IConnection.cs" />
+    <Compile Include="KexAlgorithm.cs" />
+    <Compile Include="MacAlgorithm.cs" />
+    <Compile Include="MeasuredStream.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PublicKeyAlgorithm.cs" />
+    <Compile Include="SshAuthenticationService.cs" />
+    <Compile Include="SshChannel.cs" />
+    <Compile Include="SshClient.cs" />
+    <Compile Include="SshConnectionService.cs" />
+    <Compile Include="SshException.cs" />
+    <Compile Include="SshPublicKey.cs" />
+    <Compile Include="SshService.cs" />
+    <Compile Include="SshStreamReader.cs" />
+    <Compile Include="SshStreamWriter.cs" />
+    <Compile Include="TcpConnection.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Keys\dss-default.key" />
+    <None Include="Keys\rsa-default.key" />
+    <None Include="SSH.NET.pfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Info\Public Key Formats.txt" />
+    <Content Include="Info\SSH_MSG_KEXINIT_0.txt" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

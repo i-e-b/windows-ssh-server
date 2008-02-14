@@ -20,6 +20,29 @@ namespace WindowsSshServer
             _buffers = new byte[2][];
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            try
+            {
+                if (disposing && (_stream != null))
+                {
+                    try
+                    {
+                        _stream.Flush();
+                    }
+                    finally
+                    {
+                        _stream.Close();
+                    }
+                }
+            }
+            finally
+            {
+                _stream = null;
+                base.Dispose(disposing);
+            }
+        }
+
         public Stream BaseStream
         {
             get { return _stream; }

@@ -9,6 +9,8 @@ namespace WindowsSshServer
 {
     public sealed class SshTcpServer : IDisposable
     {
+        public event EventHandler<ClientConnectedEventArgs> ClientConnected;
+
         private TcpListener _tcpListener; // Listens for TCP connections from clients.
         private List<SshClient> _clients; // List of connected clients.
 
@@ -30,7 +32,12 @@ namespace WindowsSshServer
 
         public List<SshClient> Clients
         {
-            get { return _clients; }
+            get
+            {
+                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+                return _clients;
+            }
         }
 
         public void Dispose()
@@ -60,11 +67,26 @@ namespace WindowsSshServer
 
         public bool IsRunning
         {
-            get { lock (_listenerLock) return _tcpListener != null; }
+            get
+            {
+                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+                lock (_listenerLock)
+                {
+                    return (_tcpListener != null);
+                }
+            }
+        }
+
+        public bool IsDisposed
+        {
+            get { return _isDisposed; }
         }
 
         public void Start()
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             lock (_listenerLock)
             {
                 Start(new IPEndPoint(IPAddress.Any, 22));
@@ -76,6 +98,8 @@ namespace WindowsSshServer
 
         public void Start(IPEndPoint localEP)
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             lock (_listenerLock)
             {
                 // Create TCP listener and start it.
@@ -86,6 +110,8 @@ namespace WindowsSshServer
 
         public void Stop()
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             lock (_listenerLock)
             {
                 if (_tcpListener != null)
@@ -99,6 +125,8 @@ namespace WindowsSshServer
 
         public void CloseAllConnections()
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             // Disconnect each client.
             foreach (var client in _clients)
             {
@@ -114,6 +142,8 @@ namespace WindowsSshServer
 
         private void AcceptTcpClient(IAsyncResult ar)
         {
+            if (_isDisposed) return;
+
             // Check that operation has completed.
             if (!ar.IsCompleted) return;
 
@@ -141,7 +171,9 @@ namespace WindowsSshServer
 
         private void client_Connected(object sender, EventArgs e)
         {
-            //
+            // Raise event.
+            if (ClientConnected != null) ClientConnected(this, new ClientConnectedEventArgs(
+                (SshClient)sender));
         }
 
         private void client_Disconnected(object sender, EventArgs e)
@@ -150,6 +182,20 @@ namespace WindowsSshServer
 
             // Remove client from list.
             _clients.Remove(client);
+        }
+    }
+
+    public class ClientConnectedEventArgs : EventArgs
+    {
+        public ClientConnectedEventArgs(SshClient client)
+        {
+            this.Client = client;
+        }
+
+        public SshClient Client
+        {
+            get;
+            protected set;
         }
     }
 }

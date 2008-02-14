@@ -8,9 +8,9 @@ namespace WindowsSshServer
 {
     public abstract class MacAlgorithm : IDisposable, ICloneable
     {
-        protected HMAC _algorithm;        // Algorithm to use.
+        protected KeyedHashAlgorithm _algorithm; // Algorithm to use.
 
-        private bool _isDisposed = false; // True if object has been disposed.
+        private bool _isDisposed = false;        // True if object has been disposed.
 
         public MacAlgorithm()
         {
@@ -53,7 +53,7 @@ namespace WindowsSshServer
             get;
         }
 
-        public HMAC Algorithm
+        public KeyedHashAlgorithm Algorithm
         {
             get { return _algorithm; }
         }

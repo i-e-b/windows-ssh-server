@@ -54,13 +54,20 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
+    <Reference Include="Twofish, Version=1.0.2965.36651, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Twofish.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Algorithms\SshTwofish256Cbc.cs" />
+    <Compile Include="Algorithms\SshTwofish128Cbc.cs" />
+    <Compile Include="Algorithms\SshTwofish192Cbc.cs" />
     <Compile Include="Algorithms\SshZlibCompression.cs" />
     <Compile Include="Algorithms\SshNoCompression.cs" />
     <Compile Include="Algorithms\SshAes256Cbc.cs" />
     <Compile Include="Algorithms\SshAes128Cbc.cs" />
-    <Compile Include="Algorithms\SshAes196Cbc.cs" />
+    <Compile Include="Algorithms\SshAes192Cbc.cs" />
     <Compile Include="Algorithms\SshHmacMd5_96.cs" />
     <Compile Include="Algorithms\SshHmacMd5.cs" />
     <Compile Include="Algorithms\SshHmacSha1_96.cs" />
@@ -73,9 +80,9 @@
     <Compile Include="BasicExtensions.cs" />
     <Compile Include="CompressionAlgorithm.cs" />
     <Compile Include="CachedStream.cs" />
+    <Compile Include="MeasuredStream.cs" />
     <Compile Include="SshConnectionService.cs" />
     <Compile Include="IConnection.cs" />
-    <Compile Include="SshPacket.cs" />
     <Compile Include="SshService.cs" />
     <Compile Include="SshAuthenticationService.cs" />
     <Compile Include="SshException.cs" />
@@ -118,7 +125,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="SshClient.cs" />
-    <Compile Include="SshDisconnectedException.cs" />
+    <Compile Include="DisconnectedException.cs" />
     <Compile Include="SshTcpServer.cs" />
     <Compile Include="SshStreamReader.cs" />
     <Compile Include="SshStreamWriter.cs" />

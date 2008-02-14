@@ -14,7 +14,7 @@ namespace WindowsSshServer
 {
     public partial class MainForm : Form
     {
-        internal SshTcpServer _server; // TCP server for SSH clients.
+        protected SshTcpServer _server; // TCP server for SSH clients.
 
         public MainForm()
         {
@@ -26,8 +26,33 @@ namespace WindowsSshServer
             // Create TCP server.
             _server = new SshTcpServer();
 
+            _server.ClientConnected += new EventHandler<ClientConnectedEventArgs>(_server_ClientConnected);
+
             // Start server immediately.
             startButton.PerformClick();
+        }
+
+        private void _server_ClientConnected(object sender, ClientConnectedEventArgs e)
+        {
+            var authService = e.Client.AuthenticationService;
+
+            authService.BannerMessage = Application.ProductName + "\r\n";
+            authService.AuthenticateUser += new EventHandler<AuthenticateUserEventArgs>(
+                authService_AuthenticateUser);
+            authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
+                authService_ChangePassword);
+        }
+
+        private void authService_AuthenticateUser(object sender, AuthenticateUserEventArgs e)
+        {
+            if (e.AuthMethod == AuthenticationMethod.None) return;
+
+            e.Result = AuthenticationResult.PasswordExpired;
+        }
+
+        private void authService_ChangePassword(object sender, ChangePasswordEventArgs e)
+        {
+            e.Result = PasswordChangeResult.Failure;
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
@@ -66,6 +91,11 @@ namespace WindowsSshServer
 
             statusLabel.Text = _server.IsRunning ? "Running" : "Stopped";
             clientCountLabel.Text = string.Format("{0} clients", _server.Clients.Count);
+
+            if (_server.Clients.Count > 0)
+            {
+                this.Text = _server.Clients[0].BytesTransmittedSinceLastKex.ToString();
+            }
         }
     }
 }

@@ -59,5 +59,30 @@ namespace SshDotNet
                 _tcpClient = null;
             }
         }
+
+        public bool HandleException(SshClient client, Exception ex)
+        {
+            // Check if socket exception was root cause.
+            if (ex.InnerException != null && ex.InnerException is SocketException)
+            {
+                var exSocket = (SocketException)ex.InnerException;
+
+                switch (exSocket.SocketErrorCode)
+                {
+                    case SocketError.Interrupted:
+                        client.Disconnect(false);
+                        return true;
+                    case SocketError.ConnectionAborted:
+                        client.Disconnect(false);
+                        return true;
+                    case SocketError.ConnectionReset:
+                        client.Disconnect(true);
+                        return true;
+                }
+            }
+
+            // Exception was not handled.
+            return false;
+        }
     }
 }

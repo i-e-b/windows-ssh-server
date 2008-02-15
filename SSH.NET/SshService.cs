@@ -7,6 +7,9 @@ namespace SshDotNet
 {
     public abstract class SshService : IDisposable
     {
+        public event EventHandler<EventArgs> Started;
+        public event EventHandler<EventArgs> Stopped;
+
         protected SshClient _client;      // Client for which service is running.
 
         private bool _isDisposed = false; // True if object has been disposed.
@@ -54,6 +57,16 @@ namespace SshDotNet
 
         internal abstract bool ProcessMessage(byte[] payload);
 
-        internal abstract void Start();
+        internal virtual void Start()
+        {
+            // Raise event.
+            if (Started != null) Started(this, new EventArgs());
+        }
+
+        internal virtual void Stop()
+        {
+            // Raise event.
+            if (Stopped != null) Stopped(this, new EventArgs());
+        }
     }
 }

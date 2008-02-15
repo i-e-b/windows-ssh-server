@@ -16,6 +16,8 @@ namespace WindowsSshServer
 {
     public partial class MainForm : Form
     {
+        protected const string _keysDir = @"../../../Keys/"; // Directory from which to load host keys.
+
         protected SshTcpServer _server; // TCP server for SSH clients.
 
         public MainForm()
@@ -38,11 +40,32 @@ namespace WindowsSshServer
         {
             var authService = e.Client.AuthenticationService;
 
+            e.Client.KeyExchangeInitialized += new EventHandler<SshKeyExchangeInitializedEventArgs>(Client_KeyExchangeCompleted);
+
             authService.BannerMessage = Application.ProductName + "\r\n";
             authService.AuthenticateUser += new EventHandler<AuthenticateUserEventArgs>(
                 authService_AuthenticateUser);
             authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
                 authService_ChangePassword);
+        }
+
+        private void Client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
+        {
+            // Load host key for chosen algorithm.
+            if (e.HostKeyAlgorithm is SshDss)
+            {
+                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
+                    FileMode.Open, FileAccess.Read))
+                    e.HostKeyAlgorithm.ImportKey(fileStream);
+            }
+            else if (e.HostKeyAlgorithm is SshRsa)
+            {
+                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"rsa-default.key"),
+                    FileMode.Open, FileAccess.Read))
+                    e.HostKeyAlgorithm.ImportKey(fileStream);
+            }
+
+            //MessageBox.Show(new SshPublicKey(e.HostKeyAlgorithm).GetFingerprint());
         }
 
         private void authService_AuthenticateUser(object sender, AuthenticateUserEventArgs e)
@@ -76,15 +99,18 @@ namespace WindowsSshServer
 
         private void generateKeysButton_Click(object sender, EventArgs e)
         {
-            const string keysDir = @"../../Keys/";
-
-            if (!Directory.Exists(keysDir)) Directory.CreateDirectory(keysDir);
+            if (!Directory.Exists(_keysDir)) Directory.CreateDirectory(_keysDir);
 
             var dssAlg = new SshDss();
             var rsaAlg = new SshRsa();
 
-            dssAlg.ExportKey(keysDir + @"dss-default.key");
-            rsaAlg.ExportKey(keysDir + @"rsa-default.key");
+            using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
+                FileMode.Create, FileAccess.Write))
+                dssAlg.ExportKey(fileStream);
+
+            using (var fileStream = new FileStream(Path.Combine(_keysDir, @"rsa-default.key"),
+                FileMode.Create, FileAccess.Write))
+                rsaAlg.ExportKey(fileStream);
         }
 
         private void updateStatusTimer_Tick(object sender, EventArgs e)

@@ -15,11 +15,7 @@ namespace SshDotNet.Algorithms
             : base()
         {
             _algorithm = new RSACryptoServiceProvider();
-        }
-
-        public override string Name
-        {
-            get { return "ssh-rsa"; }
+            base._algorithm = _algorithm;
         }
 
         public new RSACryptoServiceProvider Algorithm
@@ -27,21 +23,28 @@ namespace SshDotNet.Algorithms
             get { return _algorithm; }
         }
 
-        public override void ImportKey(Stream stream)
+        public override string Name
         {
-            // Read XML for key from stream.
-            using (var reader = new StreamReader(stream))
-            {
-                _algorithm.FromXmlString(reader.ReadToEnd());
-            }
+            get { return "ssh-rsa"; }
         }
 
-        public override void ExportKey(Stream stream)
+        public override void LoadKeyAndCertificatesData(byte[] data)
         {
-            // Write XML for key to stream.
-            using (var writer = new StreamWriter(stream))
+            using (var dataStream = new MemoryStream(data))
             {
-                writer.Write(_algorithm.ToXmlString(true));
+                using (var dataReader = new SshStreamReader(dataStream))
+                {
+                    // Read parameters from stream.
+                    var algParams = new RSAParameters();
+
+                    if (dataReader.ReadString() != this.Name) throw new SshException(
+                       "Key and certificates are not intended for this algorithm.");
+                    algParams.Exponent = dataReader.ReadMPInt();
+                    algParams.Modulus = dataReader.ReadMPInt();
+
+                    // Import parameters for algorithm key.
+                    _algorithm.ImportParameters(algParams);
+                }
             }
         }
 

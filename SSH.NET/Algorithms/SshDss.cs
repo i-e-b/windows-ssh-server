@@ -15,6 +15,7 @@ namespace SshDotNet.Algorithms
             : base()
         {
             _algorithm = new DSACryptoServiceProvider();
+            base._algorithm = _algorithm;
         }
 
         public new DSACryptoServiceProvider Algorithm
@@ -27,21 +28,25 @@ namespace SshDotNet.Algorithms
             get { return "ssh-dss"; }
         }
 
-        public override void ImportKey(Stream stream)
+        public override void LoadKeyAndCertificatesData(byte[] data)
         {
-            // Read XML for key from stream.
-            using (var reader = new StreamReader(stream))
+            using (var dataStream = new MemoryStream(data))
             {
-                _algorithm.FromXmlString(reader.ReadToEnd());
-            }
-        }
+                using (var dataReader = new SshStreamReader(dataStream))
+                {
+                    // Read parameters from stream.
+                    var algParams = new DSAParameters();
 
-        public override void ExportKey(Stream stream)
-        {
-            // Write XML for key to stream.
-            using (var writer = new StreamWriter(stream))
-            {
-                writer.Write(_algorithm.ToXmlString(true));
+                    if (dataReader.ReadString() != this.Name) throw new SshException(
+                       "Key and certificates are not intended for this algorithm.");
+                    algParams.P = dataReader.ReadMPInt();
+                    algParams.Q = dataReader.ReadMPInt();
+                    algParams.G = dataReader.ReadMPInt();
+                    algParams.Y = dataReader.ReadMPInt();
+
+                    // Import parameters for algorithm key.
+                    _algorithm.ImportParameters(algParams);
+                }
             }
         }
 

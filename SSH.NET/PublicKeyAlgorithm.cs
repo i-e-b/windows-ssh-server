@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Xml;
 
 namespace SshDotNet
 {
@@ -54,27 +55,57 @@ namespace SshDotNet
             get { return _algorithm; }
         }
 
-        public void ImportKey(string fileName)
+        #region Key Importing/Exporting
+
+        public void ImportPublicKey(SshPublicKey key)
         {
-            // Open file stream.
-            using (var fileStream = new FileStream(fileName, FileMode.Open, FileAccess.Read))
+            // Import only public key parameters.
+            LoadKeyAndCertificatesData(key.KeyAndCertificatesData);
+        }
+
+        public SshPublicKey ExportPublicKey()
+        {
+            // Export only public key parameters.
+            return new SshPublicKey()
             {
-                ImportKey(fileStream);
+                KeyAndCertificatesData = CreateKeyAndCertificatesData()
+            };
+        }
+
+        public void ImportKey(Stream stream)
+        {
+            // Import key parameters from stream in XML format.
+            using (var xmlReader = new XmlTextReader(stream))
+            {
+                xmlReader.MoveToContent();
+                ImportKey(xmlReader.ReadOuterXml());
             }
         }
 
-        public abstract void ImportKey(Stream stream);
-
-        public void ExportKey(string fileName)
+        public void ImportKey(string xml)
         {
-            // Open file stream.
-            using (var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write))
+            // Import key parameters from XML string.
+            _algorithm.FromXmlString(xml);
+        }
+
+        public void ExportKey(Stream stream)
+        {
+            // Write key parameters to stream in XML format.
+            using (var writer = new StreamWriter(stream))
             {
-                ExportKey(fileStream);
+                writer.WriteLine(ExportKey());
             }
         }
 
-        public abstract void ExportKey(Stream stream);
+        public string ExportKey()
+        {
+            // Export key parameters to XML string.
+            return _algorithm.ToXmlString(true);
+        }
+
+        #endregion
+
+        public abstract void LoadKeyAndCertificatesData(byte[] data);
 
         public abstract byte[] CreateKeyAndCertificatesData();
 

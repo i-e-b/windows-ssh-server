@@ -9,7 +9,6 @@ namespace SshDotNet
 {
     public class SshAuthenticationService : SshService
     {
-        public event EventHandler<EventArgs> Started;
         public event EventHandler<AuthenticateUserEventArgs> AuthenticateUser;
         public event EventHandler<ChangePasswordEventArgs> ChangePassword;
 
@@ -104,8 +103,12 @@ namespace SshDotNet
             // Create timer to detect timeout.
             _authTimeoutTimer = new Timer(new TimerCallback(AuthTimerCallback), null, 0, 1000);
 
-            // Raise event.
-            if (Started != null) Started(this, new EventArgs());
+            base.Start();
+        }
+
+        internal override void Stop()
+        {
+            base.Stop();
         }
 
         internal override bool ProcessMessage(byte[] payload)
@@ -257,7 +260,7 @@ namespace SshDotNet
                 {
                     // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.PublicKeyOk);
-
+                    
                     // Write public key information.
                     msgWriter.Write(algName);
                     msgWriter.Write(keyBlob);

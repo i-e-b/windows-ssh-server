@@ -8,6 +8,9 @@ namespace SshDotNet
 {
     public class SshChannel
     {
+        protected uint _numberSender;    // Channel number for sender.
+        protected uint _numberRecipient; // Channel number for recipient.
+
         public SshChannel()
         {
             //

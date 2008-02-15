@@ -35,6 +35,7 @@ namespace SshDotNet
         public event EventHandler<SshDisconnectedEventArgs> Disconnected;
         public event EventHandler<EventArgs> Error;
         public event EventHandler<SshDebugMessageReceivedEventArgs> DebugMessageReceived;
+        public event EventHandler<SshKeyExchangeInitializedEventArgs> KeyExchangeInitialized;
 
         protected const string _protocolVersion = "2.0"; // Implemented version of SSH protocol.
         protected const uint _maxPacketLength = 35000;   // Maximum total length of packet.
@@ -442,7 +443,10 @@ namespace SshDotNet
 
             if (service != null)
             {
-                // Activate request service.
+                // Stop active service, if there is one.
+                if (_activeService != null) _activeService.Stop();
+
+                // Activate requested service.
                 _activeService = service;
                 _activeService.Start();
             }
@@ -1188,15 +1192,9 @@ namespace SshDotNet
             _newLanguageCtoS = ChooseLanguage(langsCtoS);
             _newLanguageStoC = ChooseLanguage(langsStoC);
 
-            // Load host key for chosen algorithm.
-            if (_hostKeyAlg is SshDss)
-            {
-                _hostKeyAlg.ImportKey(@"../../Keys/dss-default.key");
-            }
-            else if (_hostKeyAlg is SshRsa)
-            {
-                _hostKeyAlg.ImportKey(@"../../Keys/rsa-default.key");
-            }
+            // Raise event, key exchange has completed.
+            if (KeyExchangeInitialized != null) KeyExchangeInitialized(this,
+                new SshKeyExchangeInitializedEventArgs(_hostKeyAlg));
         }
 
         protected void ProcessMsgNewKeys(SshStreamReader msgReader)
@@ -1218,7 +1216,8 @@ namespace SshDotNet
             _macAlgStoC = _newMacAlgStoC;
             _languageCtoS = _newLanguageCtoS;
             _languageStoC = _newLanguageStoC;
-
+            
+            // Create encryptor and decryptor for algorithms.
             _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor();
             _cryptoTransformStoC = _encAlgStoC.Algorithm.CreateEncryptor();
         }
@@ -1629,7 +1628,7 @@ namespace SshDotNet
                 // Send kex initialization message.
                 SendMsgKexInit();
 
-                // Read packets from network stream until end of stream is reached.
+                // Read packets from network stream until connection is closed.
                 byte[] packet = new byte[_maxPacketLength];
 
                 while (true)
@@ -1637,6 +1636,11 @@ namespace SshDotNet
                     // Read next packet.
                     ReadPacket();
                 }
+            }
+            catch (SshException exSsh)
+            {
+                // Fatal error has occurred.
+                FatalErrorOccurred(exSsh);
             }
             catch (DisconnectedException)
             {
@@ -1647,52 +1651,23 @@ namespace SshDotNet
                 // Client disconnected.
                 Disconnect(true);
             }
-            catch (IOException exIo)
-            {
-                // Check if socket exception was root cause.
-                if (exIo.InnerException is SocketException)
-                {
-                    var exSocket = (SocketException)exIo.InnerException;
-
-                    switch (exSocket.SocketErrorCode)
-                    {
-                        case SocketError.Interrupted:
-                            Disconnect(false);
-                            break;
-                        case SocketError.ConnectionAborted:
-                            Disconnect(false);
-                            break;
-                        case SocketError.ConnectionReset:
-                            Disconnect(true);
-                            break;
-                        default:
-                            // Fatal error has occurred.
-                            FatalErrorOccurred(exSocket);
-                            break;
-                    }
-                }
-                else
-                {
-                    // Fatal error has occurred.
-                    FatalErrorOccurred(exIo);
-                }
-            }
-            catch (SshException exSsh)
-            {
-                // Fatal error has occurred.
-                FatalErrorOccurred(exSsh);
-            }
             catch (ThreadAbortException)
             {
                 // Thread has been aborted.
             }
             catch (Exception ex)
             {
-                // Fatal error has occurred.
-                FatalErrorOccurred(ex);
+                // Let connection object handle exception.
+                var exHandled = _connection.HandleException(this, ex);
+
+                if (!exHandled)
+                    // Fatal error has occurred.
+                    FatalErrorOccurred(ex);
             }
             finally
             {
+                // Disconnect from client.
+                Disconnect(false);
             }
         }
     }
@@ -1777,6 +1752,20 @@ namespace SshDotNet
         }
 
         public string Language
+        {
+            get;
+            protected set;
+        }
+    }
+
+    public class SshKeyExchangeInitializedEventArgs : EventArgs
+    {
+        public SshKeyExchangeInitializedEventArgs(PublicKeyAlgorithm hostKeyAlgorithm)
+        {
+            this.HostKeyAlgorithm = hostKeyAlgorithm;
+        }
+
+        public PublicKeyAlgorithm HostKeyAlgorithm
         {
             get;
             protected set;

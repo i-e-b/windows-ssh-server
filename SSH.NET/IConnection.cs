@@ -11,5 +11,6 @@ namespace SshDotNet
         Stream GetStream();
 
         void Disconnect(bool remotely);
+        bool HandleException(SshClient client, Exception ex);
     }
 }

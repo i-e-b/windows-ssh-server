@@ -46,15 +46,41 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //throw new NotImplementedException();
-            return false;
+            // Create memory stream from payload data.
+            using (var msgStream = new MemoryStream(payload))
+            {
+                var msgReader = new SshStreamReader(msgStream);
+
+                // Check message ID.
+                SshConnectionMessage messageId = (SshConnectionMessage)msgReader.ReadByte();
+
+                switch (messageId)
+                {
+                    case SshConnectionMessage.GlobalRequest:
+                        ProcessMsgGlobalRequest(msgReader);
+                        break;
+                    // Unrecognised message
+                    default:
+                        return false;
+                }
+            }
+
+            // Message was recognised.
+            return true;
         }
 
         internal override void Start()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //throw new NotImplementedException();
+            //
+
+            base.Start();
+        }
+
+        internal override void Stop()
+        {
+            base.Stop();
         }
 
         protected void SendMsgGlobalRequest(string requestName, bool wantReply, byte[] data)
@@ -64,21 +90,25 @@ namespace SshDotNet
             // Create message to send.
             using (var msgStream = new MemoryStream())
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    // Write message ID.
-                    msgWriter.Write((byte)SshConnectionMessage.GlobalRequest);
+                var msgWriter = new SshStreamWriter(msgStream);
 
-                    // Write request information.
-                    msgWriter.Write(requestName);
-                    msgWriter.Write(wantReply);
+                // Write message ID.
+                msgWriter.Write((byte)SshConnectionMessage.GlobalRequest);
 
-                    if (data != null) msgWriter.Write(data);
-                }
+                // Write request information.
+                msgWriter.Write(requestName);
+                msgWriter.Write(wantReply);
+
+                if (data != null) msgWriter.Write(data);
 
                 // Send Global Request message.
                 _client.SendPacket(msgStream.ToArray());
             }
+        }
+
+        protected void ProcessMsgGlobalRequest(SshStreamReader msgReader)
+        {
+            //
         }
     }
 
@@ -95,7 +125,7 @@ namespace SshDotNet
         ChannelExtendedData = 95,
         ChannelEof = 96,
         ChannelClose = 97,
-        ChannelRequest= 98,
+        ChannelRequest = 98,
         ChannelSuccess = 99,
         ChannelFailure = 100,
     }

@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Users>
+  <User Name="Test User 1">
+    <Auth>
+      <Or>
+        <Method Name="publickey" KeyFiles="test-key.txt" />
+        <Method Name="password" Password="my_password1" />
+      </Or>
+    </Auth>
+  </User>
+  <User Name="Test User 2">
+    <Auth>
+      <Method Name="password" Password="my_password2" />
+      <Method Name="keyboard-interactive" abc="def" />
+    </Auth>
+  </User>
+</Users>

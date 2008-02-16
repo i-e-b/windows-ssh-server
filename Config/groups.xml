@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Groups>
+  <Group ID="Test Group 1">
+    <Auth AllowUserAuth="false">
+      <Method Name="hostbased" abc="def" />
+    </Auth>
+    <Users>
+      <Add UserName="Test User 1" />
+      <Add UserName="Test User 2" />
+    </Users>
+  </Group>
+  <Group ID="Test Group 2">
+    <Users>
+      <Add UserName="*" />
+      <Remove UserName="Test User 2" />
+    </Users>
+  </Group>
+</Groups>

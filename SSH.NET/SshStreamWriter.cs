@@ -48,32 +48,34 @@ namespace SshDotNet
             Write(value);
         }
 
-        public void WriteMPint(int value)
-        {
-            // Get array of bytes for specified integer value.
-            byte[] rawNum = BitConverter.GetBytes(value);
-            uint leadingZerosCount = 0;
+        //public void WriteMPint(int value)
+        //{
+        //    // Get array of bytes for specified integer value.
+        //    byte[] rawNum = BitConverter.GetBytes(value);
+        //    uint leadingZerosCount = 0;
 
-            while (rawNum[leadingZerosCount] == 0) leadingZerosCount++;
+        //    while (rawNum[leadingZerosCount] == 0) leadingZerosCount++;
 
-            // Strip leading zeros from byte array.
-            byte[] num = new byte[rawNum.Length - leadingZerosCount];
+        //    // Strip leading zeros from byte array.
+        //    byte[] num = new byte[rawNum.Length - leadingZerosCount];
 
-            Array.Copy(rawNum, leadingZerosCount, num, 0, num.Length);
+        //    Array.Copy(rawNum, leadingZerosCount, num, 0, num.Length);
 
-            WriteMPint(num);
-        }
+        //    WriteMPint(num);
+        //}
 
         public void WriteMPint(byte[] value)
         {
             uint strLength = (uint)value.Length;
             
-            // Insert null byte if MSB of integer is high.
+            // Write leading zero if MSB of value is high.
             bool addLeadingZero = ((value[0] & 0x80) != 0);
             if (addLeadingZero) strLength++;
 
             Write(strLength);
             if (addLeadingZero) Write((byte)0);
+
+            // Write value of integer.
             Write(value);
         }
 

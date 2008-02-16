@@ -109,16 +109,32 @@ namespace SshDotNet
 
         public abstract byte[] CreateKeyAndCertificatesData();
 
-        public byte[] CreateSignatureData(byte[] hashData)
+        public byte[] GetSignature(byte[] signatureData)
+        {
+            using (var dataStream = new MemoryStream(signatureData))
+            {
+                using (var dataReader = new SshStreamReader(dataStream))
+                {
+                    // Read signature from stream.
+                    if (dataReader.ReadString() != this.Name) throw new CryptographicException(
+                       "Signature was not created with this algorithm.");
+                    var signature = dataReader.ReadByteString();
+
+                    return signature;
+                }
+            }
+        }
+
+        public byte[] CreateSignatureData(byte[] data)
         {
             using (var dataStream = new MemoryStream())
             {
                 using (var dataWriter = new SshStreamWriter(dataStream))
                 {
-                    // Create signature of hash data.
-                    var signature = SignHash(hashData);
+                    // Create signature from hash data.
+                    var signature = SignData(data);
 
-                    // Write data to stream.
+                    // Write signature to stream.
                     dataWriter.Write(this.Name);
                     dataWriter.WriteByteString(signature);
                 }
@@ -127,7 +143,13 @@ namespace SshDotNet
             }
         }
 
-        public abstract byte[] SignHash(byte[] hashData);
+        public abstract bool VerifyData(byte[] data, byte[] signature);
+
+        public abstract bool VerifyHash(byte[] hash, byte[] signature);
+
+        public abstract byte[] SignData(byte[] data);
+
+        public abstract byte[] SignHash(byte[] hash);
 
         public abstract object Clone();
     }

@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<Rules>
+  <Rule IpAddress="192.168.2.*">
+    <Clear />
+    <Add UserName="Local-*" />
+  </Rule>
+  <Rule Domain="*.sourceforge.net">
+    <Clear />
+    <Add UserName="Test User 1"/>
+    <Add GroupName="Test User 2"/>
+  </Rule>
+  <Rule Domain="google.com">
+    <Remove UserName="Test User 1" />
+    <Add UserName="Test User 2" />
+  </Rule>
+</Rules>

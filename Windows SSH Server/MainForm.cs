@@ -40,13 +40,23 @@ namespace WindowsSshServer
         {
             var authService = e.Client.AuthenticationService;
 
-            e.Client.KeyExchangeInitialized += new EventHandler<SshKeyExchangeInitializedEventArgs>(Client_KeyExchangeCompleted);
+            e.Client.KeyExchangeInitialized += new EventHandler<SshKeyExchangeInitializedEventArgs>(
+                Client_KeyExchangeCompleted);
 
             authService.BannerMessage = Application.ProductName + "\r\n";
-            authService.AuthenticateUser += new EventHandler<AuthenticateUserEventArgs>(
+            authService.AuthenticateUserPublicKey += new EventHandler<AuthenticateUserPublicKeyEventArgs>(
+                authService_AuthenticateUserPublicKey);
+            authService.AuthenticateUserPassword += new EventHandler<AuthenticateUserPasswordEventArgs>(
                 authService_AuthenticateUser);
             authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
                 authService_ChangePassword);
+        }
+
+        private void authService_AuthenticateUserPublicKey(object sender, AuthenticateUserPublicKeyEventArgs e)
+        {
+            if (e.AuthMethod == AuthenticationMethod.None) return;
+
+            e.Result = AuthenticationResult.Success;
         }
 
         private void Client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
@@ -68,7 +78,7 @@ namespace WindowsSshServer
             //MessageBox.Show(new SshPublicKey(e.HostKeyAlgorithm).GetFingerprint());
         }
 
-        private void authService_AuthenticateUser(object sender, AuthenticateUserEventArgs e)
+        private void authService_AuthenticateUser(object sender, AuthenticateUserPasswordEventArgs e)
         {
             if (e.AuthMethod == AuthenticationMethod.None) return;
 

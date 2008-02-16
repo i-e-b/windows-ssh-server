@@ -85,6 +85,7 @@
     </Compile>
     <Compile Include="SshConsoleClient.cs" />
     <Compile Include="SshTcpServer.cs" />
+    <Compile Include="WindowsService.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="ConsoleHook.dll">

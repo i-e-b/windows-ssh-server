@@ -12,8 +12,6 @@ using System.Threading;
 
 using SshDotNet.Algorithms;
 
-using Org.Mentalis.Security.Cryptography;
-
 namespace SshDotNet
 {
     public class SshClient : IDisposable
@@ -609,7 +607,7 @@ namespace SshDotNet
                     // Read MAC (Message Authentication Code).
                     // MAC is always unencrypted.
                     mac = new byte[_macAlgCtoS.DigestLength];
-                    int macBytesRead = ReadCryptoStreamBuffer((CryptoStream)cryptoStream, mac, 0);
+                    int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
                     _streamReader.Read(mac, macBytesRead, mac.Length - macBytesRead);
 
                     if (macBytesRead > 0)
@@ -698,21 +696,26 @@ namespace SshDotNet
         // This method is just a temporary hack to get around the problem that a CryptoStream reads
         // farther ahead than necessary, which causes problems when reading encrypted and plain data from
         // a stream.
-        protected int ReadCryptoStreamBuffer(CryptoStream stream, byte[] buffer, int offset)
+        protected int ReadCryptoStreamBuffer(CachedStream stream, byte[] buffer, int offset)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            // Get internal buffer of crypto stream.
-            byte[] cryptoStreamBuffer = (byte[])typeof(CryptoStream).GetField("_InputBuffer",
-                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(stream);
-            int cryptoStreamBufferIndex = (int)typeof(CryptoStream).GetField("_InputBufferIndex",
-                BindingFlags.Instance | BindingFlags.NonPublic).GetValue(stream);
-            int bytesRead = cryptoStreamBuffer.Length - cryptoStreamBufferIndex;
+            //// Get internal buffer of crypto stream.
+            //byte[] cryptoStreamBuffer = (byte[])typeof(CryptoStream).GetField("_InputBuffer",
+            //    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(stream);
+            //int cryptoStreamBufferIndex = (int)typeof(CryptoStream).GetField("_InputBufferIndex",
+            //    BindingFlags.Instance | BindingFlags.NonPublic).GetValue(stream);
+            //int bytesRead = cryptoStreamBuffer.Length - cryptoStreamBufferIndex;
 
-            // Copy unread data from stream buffer into output buffer.
-            Buffer.BlockCopy(cryptoStreamBuffer, cryptoStreamBufferIndex, buffer, offset, bytesRead);
+            //// Copy unread data from stream buffer into output buffer.
+            //Buffer.BlockCopy(cryptoStreamBuffer, cryptoStreamBufferIndex, buffer, offset, bytesRead);
 
-            return bytesRead;
+            // Copy last buffer from cached stream to output buffer.
+            var inputBuffer = stream.GetBuffer(1);
+
+            Buffer.BlockCopy(inputBuffer, 0, buffer, offset, inputBuffer.Length);
+
+            return inputBuffer.Length;
         }
 
         protected virtual void AddDefaultAlgorithms()
@@ -1216,7 +1219,7 @@ namespace SshDotNet
             _macAlgStoC = _newMacAlgStoC;
             _languageCtoS = _newLanguageCtoS;
             _languageStoC = _newLanguageStoC;
-            
+
             // Create encryptor and decryptor for algorithms.
             _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor();
             _cryptoTransformStoC = _encAlgStoC.Algorithm.CreateEncryptor();
@@ -1666,8 +1669,12 @@ namespace SshDotNet
             }
             finally
             {
-                // Disconnect from client.
-                Disconnect(false);
+                // Check if object has already been disposed.
+                if (!_isDisposed)
+                {
+                    // Disconnect from client.
+                    Disconnect(false);
+                }
             }
         }
     }

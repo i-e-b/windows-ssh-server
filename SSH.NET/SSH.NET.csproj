@@ -95,6 +95,7 @@
     <Compile Include="SshException.cs" />
     <Compile Include="SshPublicKey.cs" />
     <Compile Include="SshService.cs" />
+    <Compile Include="SshSessionChannel.cs" />
     <Compile Include="SshStreamReader.cs" />
     <Compile Include="SshStreamWriter.cs" />
     <Compile Include="TcpConnection.cs" />

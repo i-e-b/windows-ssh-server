@@ -49,19 +49,33 @@ namespace SshDotNet
             return ReadBytes(strLength);
         }
 
-        //public int ReadMPInt()
+        //public int ReadMPInt32()
         //{
-        //    uint strLength = ReadUInt32();
-        //    byte[] value = ReadBytes(strLength);
-
-        //    return BitConverter.ToInt32(value, 0);
+        //    return BitConverter.ToInt32(ReadMPInt(), 0);
         //}
 
+        // Important: method assumes number will always be treated as positive, and therefore strips off
+        // a leading zero if one exists.
         public byte[] ReadMPInt()
         {
-            var strLength = ReadUInt32();
+            // Read bytes from stream.
+            var data = ReadBytes(ReadUInt32());
 
-            return ReadBytes(strLength);
+            // Check if value contains leading zero.
+            if (data.Length > 0 && data[0] == 0)
+            {
+                // Stip off leading zero.
+                var output = new byte[data.Length - 1];
+                Buffer.BlockCopy(data, 1, output, 0, output.Length);
+
+                // Return value of integer.
+                return output;
+            }
+            else
+            {
+                // Return value of integer.
+                return data;
+            }
         }
 
         public string ReadString()

@@ -6,14 +6,41 @@ using System.Text;
 
 namespace SshDotNet
 {
-    public class SshChannel
+    public abstract class SshChannel
     {
-        protected uint _numberSender;    // Channel number for sender.
-        protected uint _numberRecipient; // Channel number for recipient.
+        //protected uint _senderChannel;    // Channel number for sender.
+        //protected uint _recipientChannel; // Channel number for recipient.
 
-        public SshChannel()
+        public SshChannel(uint senderChannel, uint recipientChannel, uint windowSize, uint maxPacketSize)
         {
-            //
+            this.SenderChannel = senderChannel;
+            this.RecipientChannel = recipientChannel;
+            this.WindowSize = windowSize;
+            this.MaxPacketSize = maxPacketSize;
+        }
+
+        public uint SenderChannel
+        {
+            get;
+            set;
+        }
+
+        public uint RecipientChannel
+        {
+            get;
+            set;
+        }
+
+        public uint WindowSize
+        {
+            get;
+            protected set;
+        }
+
+        public uint MaxPacketSize
+        {
+            get;
+            protected set;
         }
 
         //

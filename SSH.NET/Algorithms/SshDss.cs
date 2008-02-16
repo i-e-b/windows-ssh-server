@@ -37,8 +37,8 @@ namespace SshDotNet.Algorithms
                     // Read parameters from stream.
                     var algParams = new DSAParameters();
 
-                    if (dataReader.ReadString() != this.Name) throw new SshException(
-                       "Key and certificates are not intended for this algorithm.");
+                    if (dataReader.ReadString() != this.Name) throw new CryptographicException(
+                       "Key and certificates were not created with this algorithm.");
                     algParams.P = dataReader.ReadMPInt();
                     algParams.Q = dataReader.ReadMPInt();
                     algParams.G = dataReader.ReadMPInt();
@@ -71,13 +71,33 @@ namespace SshDotNet.Algorithms
             }
         }
 
-        public override byte[] SignHash(byte[] hashData)
+        public override bool VerifyData(byte[] data, byte[] signature)
+        {
+            return _algorithm.VerifyData(data, signature);
+        }
+
+        public override bool VerifyHash(byte[] hash, byte[] signature)
         {
             var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
 
             using (var sha1 = new SHA1CryptoServiceProvider())
             {
-                return _algorithm.SignHash(sha1.ComputeHash(hashData), hashAlgOid);
+                return _algorithm.VerifyHash(hash, hashAlgOid, signature);
+            }
+        }
+
+        public override byte[] SignData(byte[] data)
+        {
+            return _algorithm.SignData(data);
+        }
+
+        public override byte[] SignHash(byte[] hash)
+        {
+            var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
+
+            using (var sha1 = new SHA1CryptoServiceProvider())
+            {
+                return _algorithm.SignHash(sha1.ComputeHash(hash), hashAlgOid);
             }
         }
 

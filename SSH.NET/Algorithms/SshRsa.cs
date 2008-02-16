@@ -37,8 +37,8 @@ namespace SshDotNet.Algorithms
                     // Read parameters from stream.
                     var algParams = new RSAParameters();
 
-                    if (dataReader.ReadString() != this.Name) throw new SshException(
-                       "Key and certificates are not intended for this algorithm.");
+                    if (dataReader.ReadString() != this.Name) throw new CryptographicException(
+                       "Key and certificates were not created with this algorithm.");
                     algParams.Exponent = dataReader.ReadMPInt();
                     algParams.Modulus = dataReader.ReadMPInt();
 
@@ -55,7 +55,7 @@ namespace SshDotNet.Algorithms
                 using (var dataWriter = new SshStreamWriter(dataStream))
                 {
                     // Export parameters for algorithm key.
-                    var algParams = _algorithm.ExportParameters(true);
+                    var algParams = _algorithm.ExportParameters(false);
 
                     // Write parameters to stream.
                     dataWriter.Write(this.Name);
@@ -67,14 +67,28 @@ namespace SshDotNet.Algorithms
             }
         }
 
-        public override byte[] SignHash(byte[] hashData)
+        public override bool VerifyData(byte[] data, byte[] signature)
+        {
+            return _algorithm.VerifyData(data, "SHA1", signature);
+        }
+
+        public override bool VerifyHash(byte[] hash, byte[] signature)
         {
             var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
 
-            using (var sha1 = new SHA1CryptoServiceProvider())
-            {
-                return _algorithm.SignHash(sha1.ComputeHash(hashData), hashAlgOid);
-            }
+            return _algorithm.VerifyHash(hash, hashAlgOid, signature);
+        }
+
+        public override byte[] SignData(byte[] data)
+        {
+            return _algorithm.SignData(data, "SHA1");
+        }
+
+        public override byte[] SignHash(byte[] hash)
+        {
+            var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
+
+            return _algorithm.SignHash(hash, hashAlgOid);
         }
 
         public override object Clone()

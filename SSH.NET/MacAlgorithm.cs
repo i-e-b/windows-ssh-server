@@ -36,7 +36,7 @@ namespace SshDotNet
                     // Dispose managed resources.
                     if (_algorithm != null) _algorithm.Clear();
                 }
-
+                
                 // Dispose unmanaged resources.
             }
 

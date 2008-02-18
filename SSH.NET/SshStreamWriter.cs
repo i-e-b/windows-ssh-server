@@ -64,6 +64,8 @@ namespace SshDotNet
         //    WriteMPint(num);
         //}
 
+        // Important: method assumes value is always positive integer, and therefore adds leading zero is
+        // necessary.
         public void WriteMPint(byte[] value)
         {
             uint strLength = (uint)value.Length;

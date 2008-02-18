@@ -12,6 +12,7 @@ namespace SshDotNet
         public event EventHandler<AuthenticateUserNoMethodEventArgs> AuthenticateUserNoMethod;
         public event EventHandler<AuthenticateUserPublicKeyEventArgs> AuthenticateUserPublicKey;
         public event EventHandler<AuthenticateUserPasswordEventArgs> AuthenticateUserPassword;
+        public event EventHandler<AuthenticateUserHostBasedEventArgs> AuthenticateUserHostBased;
         public event EventHandler<ChangePasswordEventArgs> ChangePassword;
         public event EventHandler<EventArgs> UserAuthenticated;
 
@@ -31,6 +32,7 @@ namespace SshDotNet
             _authMethods = new List<AuthenticationMethod>() { AuthenticationMethod.PublicKey,
                 AuthenticationMethod.Password, AuthenticationMethod.HostBased, 
                 }; // AuthenticationMethod.KeyboardInteractive };
+            _authMethods = new List<AuthenticationMethod>() { AuthenticationMethod.HostBased };
             _failedAuthAttempts = 0;
 
             // Initialize properties to default values.
@@ -342,14 +344,15 @@ namespace SshDotNet
                 // Read client signature.
                 var signatureData = msgReader.ReadByteString();
                 var signature = keyAlg.GetSignature(signatureData);
-                var payloadData = ((MemoryStream)msgReader.BaseStream).ToArray();
 
                 // Verify signature.
-                if (VerifyPublicKeySignature(keyAlg, payloadData, 0, payloadData.Length
-                    - signatureData.Length - 4, signature))
+                var payloadData = ((MemoryStream)msgReader.BaseStream).ToArray();
+
+                if (VerifyPublicKeySignature(keyAlg, payloadData, 0, payloadData.Length -
+                   signatureData.Length - 4, signature))
                 {
                     // Raise event to get result of auth attempt.
-                    var authUserEventArgs = new AuthenticateUserPublicKeyEventArgs(
+                    var authUserEventArgs = new AuthenticateUserPublicKeyEventArgs(userName,
                         new SshPublicKey(keyAlg));
 
                     AuthenticateUserPublicKey(this, authUserEventArgs);
@@ -496,12 +499,57 @@ namespace SshDotNet
 
             // Read request information.
             string keyAlgName = msgReader.ReadString();
-            string keyBlob = msgReader.ReadString();
+            byte[] keyAndCertsData = msgReader.ReadByteString();
             string clientHostName = msgReader.ReadString();
             string clientHostUserName = msgReader.ReadString();
-            string signature = msgReader.ReadString();
+            
+            // Try to find public key algorithm.
+            var keyAlg = (PublicKeyAlgorithm)_client.PublicKeyAlgorithms.SingleOrDefault(item =>
+                item.Name == keyAlgName).Clone();
+
+            // Load key and certificats data for algorithm.
+            keyAlg.LoadKeyAndCertificatesData(keyAndCertsData);
+
+            // Read client signature.
+            var signatureData = msgReader.ReadByteString();
+            var signature = keyAlg.GetSignature(signatureData);
 
             // Verify signature.
+            var payloadData = ((MemoryStream)msgReader.BaseStream).ToArray();
+
+            if (VerifyPublicKeySignature(keyAlg, payloadData, 0, payloadData.Length -
+                signatureData.Length - 4, signature))
+            {
+                // Raise event to get result of auth attempt.
+                var authUserEventArgs = new AuthenticateUserHostBasedEventArgs(userName);
+
+                AuthenticateUserHostBased(this, authUserEventArgs);
+
+                // Check result of auth attempt.
+                switch (authUserEventArgs.Result)
+                {
+                    case AuthenticationResult.Success:
+                        // Auth has succeeded.
+                        AuthenticateUser(serviceName);
+
+                        break;
+                    case AuthenticationResult.FurtherAuthRequired:
+                        // Auth has succeeded, but further auth is required.
+                        SendMsgUserAuthFailure(true);
+
+                        break;
+                    case AuthenticationResult.Failure:
+                        // Auth has failed.
+                        SendMsgUserAuthFailure(false);
+
+                        break;
+                }
+            }
+            else
+            {
+                // Signature is invalid.
+                SendMsgUserAuthFailure(false);
+            }
         }
 
         protected void ProcessMsgUserAuthRequestKeyboardInteractive(string userName, string serviceName,
@@ -518,7 +566,7 @@ namespace SshDotNet
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             // Raise event to get result of auth attempt.
-            var authUserEventArgs = new AuthenticateUserNoMethodEventArgs();
+            var authUserEventArgs = new AuthenticateUserNoMethodEventArgs(userName);
 
             if (AuthenticateUserNoMethod != null) AuthenticateUserNoMethod(this, authUserEventArgs);
 
@@ -595,10 +643,11 @@ namespace SshDotNet
         }
     }
 
+    #region Event Arguments Types
     public class AuthenticateUserNoMethodEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserNoMethodEventArgs()
-            : base()
+        public AuthenticateUserNoMethodEventArgs(string userName)
+            : base(userName)
         {
         }
 
@@ -610,8 +659,8 @@ namespace SshDotNet
 
     public class AuthenticateUserPublicKeyEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserPublicKeyEventArgs(SshPublicKey publicKey)
-            : base()
+        public AuthenticateUserPublicKeyEventArgs(string userName, SshPublicKey publicKey)
+            : base(userName)
         {
             this.PublicKey = publicKey;
             this.Result = AuthenticationResult.Failure;
@@ -632,17 +681,10 @@ namespace SshDotNet
     public class AuthenticateUserPasswordEventArgs : AuthenticateUserEventArgs
     {
         public AuthenticateUserPasswordEventArgs(string userName, string password)
-            : base()
+            : base(userName)
         {
-            this.UserName = userName;
             this.Password = password;
             this.Result = AuthenticationResult.Failure;
-        }
-
-        public string UserName
-        {
-            get;
-            protected set;
         }
 
         public string Password
@@ -657,22 +699,44 @@ namespace SshDotNet
         }
     }
 
-    public abstract class AuthenticateUserEventArgs : EventArgs
+    public class AuthenticateUserHostBasedEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserEventArgs()
+        public AuthenticateUserHostBasedEventArgs(string userName)
+            : base(userName)
         {
-            this.Result = AuthenticationResult.Failure;
         }
 
-        public abstract AuthenticationMethod AuthMethod
+        //
+
+        public override AuthenticationMethod AuthMethod
         {
-            get;
+            get { return AuthenticationMethod.HostBased; }
+        }
+    }
+
+    public abstract class AuthenticateUserEventArgs : EventArgs
+    {
+        public AuthenticateUserEventArgs(string userName)
+        {
+            this.UserName = userName;
+            this.Result = AuthenticationResult.Failure;
         }
 
         public AuthenticationResult Result
         {
             get;
             set;
+        }
+
+        public string UserName
+        {
+            get;
+            protected set;
+        }
+
+        public abstract AuthenticationMethod AuthMethod
+        {
+            get;
         }
     }
 
@@ -710,6 +774,7 @@ namespace SshDotNet
             set;
         }
     }
+    #endregion
 
     public enum AuthenticationResult
     {

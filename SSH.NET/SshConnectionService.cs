@@ -231,7 +231,7 @@ namespace SshDotNet
         protected void ProcessMsgRequestSuccess(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
+                
             //
         }
 

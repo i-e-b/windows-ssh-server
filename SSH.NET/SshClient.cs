@@ -608,7 +608,9 @@ namespace SshDotNet
                     // MAC is always unencrypted.
                     mac = new byte[_macAlgCtoS.DigestLength];
                     int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
-                    _streamReader.Read(mac, macBytesRead, mac.Length - macBytesRead);
+                    int macBytesLeft = mac.Length - macBytesRead;
+
+                    if (macBytesLeft > 0) _streamReader.Read(mac, macBytesRead, macBytesLeft);
 
                     if (macBytesRead > 0)
                     {
@@ -843,7 +845,7 @@ namespace SshDotNet
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
                     // Write message ID.
-                    msgWriter.Write((byte)SshMessage.Reply);
+                    msgWriter.Write((byte)SshMessage.KexDhReply);
 
                     // Send server public host key and certificates.
                     msgWriter.WriteByteString(hostKeyAndCerts);
@@ -865,7 +867,7 @@ namespace SshDotNet
         protected void SendMsgDisconnect(SshDisconnectReason reason, string description, string language)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
+            
             // Create message to send.
             using (var msgStream = new MemoryStream())
             {
@@ -885,6 +887,30 @@ namespace SshDotNet
                 }
 
                 // Send Disconnect message.
+                SendPacket(msgStream.ToArray());
+            }
+        }
+
+        protected void SendMsgIgnore()
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                using (var msgWriter = new SshStreamWriter(msgStream))
+                {
+                    // Write message ID.
+                    msgWriter.Write((byte)SshMessage.Ignore);
+
+                    // Write random data, which is to be ignored.
+                    byte[] data = new byte[_rng.GetNumber(0, 16)];
+
+                    _rng.GetBytes(data);
+                    msgWriter.WriteByteString(data);
+                }
+
+                // Send Ignore message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -1045,7 +1071,7 @@ namespace SshDotNet
                             ProcessMsgNewKeys(msgReader);
                             break;
                         // Diffie-Hellman kex messages
-                        case SshMessage.Init:
+                        case SshMessage.KexDhInit:
                             ProcessMsgDhKexInit(msgReader);
                             break;
                         // Unrecognised message
@@ -1809,7 +1835,7 @@ namespace SshDotNet
         ServiceAccept = 6,
         KexInit = 20,
         NewKeys = 21,
-        Init = 30,
-        Reply = 31
+        KexDhInit = 30,
+        KexDhReply = 31
     }
 }

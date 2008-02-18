@@ -54,8 +54,8 @@ namespace SshDotNet
         //    return BitConverter.ToInt32(ReadMPInt(), 0);
         //}
 
-        // Important: method assumes number will always be treated as positive, and therefore strips off
-        // a leading zero if one exists.
+        // Important: method assumes value is always positive integer, and therefore strips off a leading 
+        // zero if one exists.
         public byte[] ReadMPInt()
         {
             // Read bytes from stream.

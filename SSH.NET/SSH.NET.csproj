@@ -108,6 +108,9 @@
   <ItemGroup>
     <Content Include="Info\Public Key Formats.txt" />
     <Content Include="Info\SSH_MSG_KEXINIT_0.txt" />
+    <Content Include="zlib1.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

@@ -66,10 +66,7 @@ namespace SshDotNet
         public SshPublicKey ExportPublicKey()
         {
             // Export only public key parameters.
-            return new SshPublicKey()
-            {
-                KeyAndCertificatesData = CreateKeyAndCertificatesData()
-            };
+            return new SshPublicKey(this);
         }
 
         public void ImportKey(Stream stream)

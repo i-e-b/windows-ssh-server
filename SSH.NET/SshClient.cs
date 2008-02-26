@@ -361,7 +361,7 @@ namespace SshDotNet
 
         internal virtual void Disconnect(bool remotely)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+            //if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             Disconnect(remotely, SshDisconnectReason.None, null, null);
         }
@@ -369,7 +369,7 @@ namespace SshDotNet
         internal virtual void Disconnect(bool remotely, SshDisconnectReason reason, string description,
             string language)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+            //if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             // Dispose objects for data transmission.
             if (_stream != null)
@@ -820,6 +820,7 @@ namespace SshDotNet
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             var lineBuilder = new StringBuilder();
+            bool lineContainsCr = false;
 
             // Read chars from stream until LF (line feed) is found.
             char curChar;
@@ -828,10 +829,12 @@ namespace SshDotNet
             {
                 curChar = _streamReader.ReadChar();
                 lineBuilder.Append(curChar);
+
+                if (curChar == '\r') lineContainsCr = true;
             } while (curChar != '\n');
 
             // Return line without trailing CR and LF.
-            return lineBuilder.ToString(0, lineBuilder.Length - 2);
+            return lineBuilder.ToString(0, lineBuilder.Length - (lineContainsCr ? 2 : 1));
         }
 
         protected void SendMsgKexDhReply(byte[] hostKeyAndCerts, byte[] clientExchangeValue,
@@ -864,10 +867,18 @@ namespace SshDotNet
             }
         }
 
+        private bool CheckByteArray(byte[] serverArray, string clientArrayText)
+        {
+            byte[] clientArray = (from item in clientArrayText.Split(new char[] { ' ' }, 
+                StringSplitOptions.RemoveEmptyEntries) select byte.Parse(item)).ToArray();
+
+            return serverArray.ArrayEquals(clientArray);
+        }
+
         protected void SendMsgDisconnect(SshDisconnectReason reason, string description, string language)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-            
+
             // Create message to send.
             using (var msgStream = new MemoryStream())
             {
@@ -1092,10 +1103,10 @@ namespace SshDotNet
             // Read disconnection info.
             SshDisconnectReason reason = (SshDisconnectReason)msgReader.ReadUInt32();
             string description = msgReader.ReadString();
-            string languageTag = msgReader.ToString();
+            string language = msgReader.ToString();
 
             // Disconnect remotely.
-            Disconnect(true, reason, description, languageTag);
+            Disconnect(true, reason, description, language);
             throw new DisconnectedException();
         }
 
@@ -1128,16 +1139,16 @@ namespace SshDotNet
             // Read debug information.
             bool alwaysDisplay = msgReader.ReadBoolean();
             string message = msgReader.ReadString();
-            string languageTag = msgReader.ToString();
+            string language = msgReader.ToString();
 
             // Write to debug.
             Debug.WriteLine("Debug message");
-            Debug.WriteLine("Language: {0}", languageTag);
+            Debug.WriteLine("Language: {0}", language);
             Debug.WriteLine(message);
             Debug.WriteLine("");
 
             // Debug message has been received.
-            OnDebugMessageReceived(new SshDebugMessageReceivedEventArgs(alwaysDisplay, message, languageTag));
+            OnDebugMessageReceived(new SshDebugMessageReceivedEventArgs(alwaysDisplay, message, language));
         }
 
         protected void ProcessMsgServiceRequest(SshStreamReader msgReader)

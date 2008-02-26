@@ -57,7 +57,7 @@ namespace SshDotNet.Algorithms
                 using (var dataWriter = new SshStreamWriter(dataStream))
                 {
                     // Export parameters for algorithm key.
-                    var algParams = _algorithm.ExportParameters(true);
+                    var algParams = _algorithm.ExportParameters(false);
 
                     // Write data to stream.
                     dataWriter.Write(this.Name);

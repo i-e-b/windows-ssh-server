@@ -1,4 +1,6 @@
 bin/
 
 obj/
-./*.ps1
+
+./push-*.ps1
+./*.InstallLog

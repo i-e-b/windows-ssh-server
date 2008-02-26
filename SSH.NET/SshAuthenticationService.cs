@@ -31,8 +31,7 @@ namespace SshDotNet
             _bannerMsgSent = false;
             _authMethods = new List<AuthenticationMethod>() { AuthenticationMethod.PublicKey,
                 AuthenticationMethod.Password, AuthenticationMethod.HostBased, 
-                }; // AuthenticationMethod.KeyboardInteractive };
-            _authMethods = new List<AuthenticationMethod>() { AuthenticationMethod.HostBased };
+                AuthenticationMethod.KeyboardInteractive };
             _failedAuthAttempts = 0;
 
             // Initialize properties to default values.
@@ -171,6 +170,26 @@ namespace SshDotNet
             }
         }
 
+        protected void SendMsgUserAuthInfoResponse()
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                using (var msgWriter = new SshStreamWriter(msgStream))
+                {
+                    // Write message ID.
+                    msgWriter.Write((byte)SshAuthenticationMessage.InfoResponse);
+
+                    //
+                }
+
+                // Send User Auth Info Response message.
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
         protected void SendMsgUserAuthSuccess()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -298,6 +317,9 @@ namespace SshDotNet
             // Check method of authentication.
             switch (methodName)
             {
+                case "none":
+                    ProcessMsgUserAuthRequestNone(userName, serviceName, msgReader);
+                    break;
                 case "publickey":
                     ProcessMsgUserAuthRequestPublicKey(userName, serviceName, msgReader);
                     break;
@@ -310,12 +332,35 @@ namespace SshDotNet
                 case "keyboard-interactive":
                     ProcessMsgUserAuthRequestKeyboardInteractive(userName, serviceName, msgReader);
                     break;
-                case "none":
-                    ProcessMsgUserAuthRequestNone(userName, serviceName, msgReader);
-                    break;
                 default:
                     // Invalid auth method.
                     _client.Disconnect(false);
+                    break;
+            }
+        }
+
+        protected void ProcessMsgUserAuthRequestNone(string userName, string serviceName,
+            SshStreamReader msgReader)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Raise event to get result of auth attempt.
+            var authUserEventArgs = new AuthenticateUserNoMethodEventArgs(userName);
+
+            if (AuthenticateUserNoMethod != null) AuthenticateUserNoMethod(this, authUserEventArgs);
+
+            // Check result of auth attempt.
+            switch (authUserEventArgs.Result)
+            {
+                case AuthenticationResult.Success:
+                    // Auth has succeeded.
+                    AuthenticateUser(serviceName);
+
+                    break;
+                case AuthenticationResult.Failure:
+                    // Send list of supported auth methods.
+                    SendMsgUserAuthFailure(false);
+
                     break;
             }
         }
@@ -331,8 +376,18 @@ namespace SshDotNet
             byte[] keyAndCertsData = msgReader.ReadByteString();
 
             // Try to find public key algorithm.
-            var keyAlg = (PublicKeyAlgorithm)_client.PublicKeyAlgorithms.SingleOrDefault(item =>
-                item.Name == keyAlgName).Clone();
+            PublicKeyAlgorithm keyAlg = null;
+
+            try
+            {
+                keyAlg = (PublicKeyAlgorithm)_client.PublicKeyAlgorithms.Single(item =>
+                    item.Name == keyAlgName).Clone();
+            }
+            catch (InvalidOperationException)
+            {
+                // Public key algorithm is not supported.
+                SendMsgUserAuthFailure(false);
+            }
 
             // Load key and certificats data for algorithm.
             keyAlg.LoadKeyAndCertificatesData(keyAndCertsData);
@@ -353,7 +408,7 @@ namespace SshDotNet
                 {
                     // Raise event to get result of auth attempt.
                     var authUserEventArgs = new AuthenticateUserPublicKeyEventArgs(userName,
-                        new SshPublicKey(keyAlg));
+                        keyAlg.ExportPublicKey());
 
                     AuthenticateUserPublicKey(this, authUserEventArgs);
 
@@ -385,17 +440,8 @@ namespace SshDotNet
             }
             else
             {
-                // Check if specified key algorithm exists.
-                if (keyAlg != null)
-                {
-                    // Public key is acceptable.
-                    SendMsgUserAuthPkOk(keyAlgName, keyAndCertsData);
-                }
-                else
-                {
-                    // Public key algorithm is not supported.
-                    SendMsgUserAuthFailure(false);
-                }
+                // Public key is acceptable.
+                SendMsgUserAuthPkOk(keyAlgName, keyAndCertsData);
             }
         }
 
@@ -501,11 +547,21 @@ namespace SshDotNet
             string keyAlgName = msgReader.ReadString();
             byte[] keyAndCertsData = msgReader.ReadByteString();
             string clientHostName = msgReader.ReadString();
-            string clientHostUserName = msgReader.ReadString();
-            
+            string clientUserName = msgReader.ReadString();
+
             // Try to find public key algorithm.
-            var keyAlg = (PublicKeyAlgorithm)_client.PublicKeyAlgorithms.SingleOrDefault(item =>
-                item.Name == keyAlgName).Clone();
+            PublicKeyAlgorithm keyAlg = null;
+
+            try
+            {
+                keyAlg = (PublicKeyAlgorithm)_client.PublicKeyAlgorithms.Single(item =>
+                    item.Name == keyAlgName).Clone();
+            }
+            catch (InvalidOperationException)
+            {
+                // Public key algorithm is not supported.
+                SendMsgUserAuthFailure(false);
+            }
 
             // Load key and certificats data for algorithm.
             keyAlg.LoadKeyAndCertificatesData(keyAndCertsData);
@@ -521,9 +577,10 @@ namespace SshDotNet
                 signatureData.Length - 4, signature))
             {
                 // Raise event to get result of auth attempt.
-                var authUserEventArgs = new AuthenticateUserHostBasedEventArgs(userName);
+                var authUserEventArgs = new AuthenticateUserHostBasedEventArgs(userName, clientHostName,
+                    clientUserName, keyAlg.ExportPublicKey());
 
-                AuthenticateUserHostBased(this, authUserEventArgs);
+                if (AuthenticateUserHostBased != null) AuthenticateUserHostBased(this, authUserEventArgs);
 
                 // Check result of auth attempt.
                 switch (authUserEventArgs.Result)
@@ -557,33 +614,12 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            // Read request information.
+            string language = msgReader.ReadString();
+            string[] subMethods = Encoding.UTF8.GetString(msgReader.ReadByteString()).Split(
+                new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
+
             //
-        }
-
-        protected void ProcessMsgUserAuthRequestNone(string userName, string serviceName,
-            SshStreamReader msgReader)
-        {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-            // Raise event to get result of auth attempt.
-            var authUserEventArgs = new AuthenticateUserNoMethodEventArgs(userName);
-
-            if (AuthenticateUserNoMethod != null) AuthenticateUserNoMethod(this, authUserEventArgs);
-
-            // Check result of auth attempt.
-            switch (authUserEventArgs.Result)
-            {
-                case AuthenticationResult.Success:
-                    // Auth has succeeded.
-                    AuthenticateUser(serviceName);
-
-                    break;
-                case AuthenticationResult.Failure:
-                    // Send list of supported auth methods.
-                    SendMsgUserAuthFailure(false);
-
-                    break;
-            }
         }
 
         protected void AuthenticateUser(string requestedService)
@@ -701,12 +737,32 @@ namespace SshDotNet
 
     public class AuthenticateUserHostBasedEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserHostBasedEventArgs(string userName)
+        public AuthenticateUserHostBasedEventArgs(string userName, string clientHostName,
+            string clientUserName, SshPublicKey publicKey)
             : base(userName)
         {
+            this.ClientHostName = clientHostName;
+            this.ClientUserName = clientUserName;
+            this.PublicKey = publicKey;
         }
 
-        //
+        public string ClientHostName
+        {
+            get;
+            protected set;
+        }
+
+        public string ClientUserName
+        {
+            get;
+            protected set;
+        }
+
+        public SshPublicKey PublicKey
+        {
+            get;
+            protected set;
+        }
 
         public override AuthenticationMethod AuthMethod
         {
@@ -808,6 +864,8 @@ namespace SshDotNet
         Success = 52,
         Banner = 53,
         PublicKeyOk = 60,
-        PasswordChangeRequired = 60
+        PasswordChangeRequired = 60,
+        InfoRequest = 61,
+        InfoResponse = 62
     }
 }

@@ -12,17 +12,18 @@ namespace WindowsSshServer
     [RunInstaller(true)]
     public class SshServiceInstaller : Installer
     {
-        // To Do: make installer specify dependencies in registry.
-        // See bottom of http://www.montgomerysoftware.com/CreatingWindowsServiceInCSharp.aspx.
         public SshServiceInstaller()
             : base()
         {
             // Add service installer.
             var serviceInstaller = new ServiceInstaller();
-
+            
             serviceInstaller.ServiceName = SshService.ServiceName;
             serviceInstaller.DisplayName = "Windows SSH Server";
-
+            serviceInstaller.Description = "Provides SSH (Secure Shell) access to the computer.";
+            serviceInstaller.StartType = ServiceStartMode.Automatic;
+            serviceInstaller.ServicesDependedOn = new string[] { "tcpip" };
+            
             this.Installers.Add(serviceInstaller);
 
             // Add service process installer.

@@ -47,16 +47,11 @@ namespace WindowsSshServer
             authService.AuthenticateUserPublicKey += new EventHandler<AuthenticateUserPublicKeyEventArgs>(
                 authService_AuthenticateUserPublicKey);
             authService.AuthenticateUserPassword += new EventHandler<AuthenticateUserPasswordEventArgs>(
-                authService_AuthenticateUser);
+                authService_AuthenticateUserPassword);
+            authService.AuthenticateUserHostBased += new EventHandler<AuthenticateUserHostBasedEventArgs>(
+                authService_AuthenticateUserHostBased);
             authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
                 authService_ChangePassword);
-        }
-
-        private void authService_AuthenticateUserPublicKey(object sender, AuthenticateUserPublicKeyEventArgs e)
-        {
-            if (e.AuthMethod == AuthenticationMethod.None) return;
-
-            e.Result = AuthenticationResult.Success;
         }
 
         private void Client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
@@ -78,12 +73,20 @@ namespace WindowsSshServer
             //MessageBox.Show(new SshPublicKey(e.HostKeyAlgorithm).GetFingerprint());
         }
 
-        private void authService_AuthenticateUser(object sender, AuthenticateUserPasswordEventArgs e)
+        private void authService_AuthenticateUserPublicKey(object sender, AuthenticateUserPublicKeyEventArgs e)
         {
-            if (e.AuthMethod == AuthenticationMethod.None) return;
+            e.Result = AuthenticationResult.Success;
+        }
 
+        private void authService_AuthenticateUserPassword(object sender, AuthenticateUserPasswordEventArgs e)
+        {
             e.Result = AuthenticationResult.Success;
             //e.Result = AuthenticationResult.PasswordExpired;
+        }
+
+        private void authService_AuthenticateUserHostBased(object sender, AuthenticateUserHostBasedEventArgs e)
+        {
+            e.Result = AuthenticationResult.Success;
         }
 
         private void authService_ChangePassword(object sender, ChangePasswordEventArgs e)

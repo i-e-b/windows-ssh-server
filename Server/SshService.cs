@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.ServiceProcess;
 using System.Text;
@@ -28,7 +29,7 @@ namespace WindowsSshServer
         {
             // Start TCP server.
             _tcpServer.Start();
-
+            
             base.OnStart(args);
         }
 

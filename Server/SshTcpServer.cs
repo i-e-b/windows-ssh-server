@@ -104,9 +104,23 @@ namespace WindowsSshServer
 
             lock (_listenerLock)
             {
-                // Create TCP listener and start it.
-                _tcpListener = new TcpListener(localEP);
-                _tcpListener.Start();
+                try
+                {
+                    // Create TCP listener and start it.
+                    _tcpListener = new TcpListener(localEP);
+                    _tcpListener.Start();
+                }
+                catch (SocketException exSocket)
+                {
+                    if (_tcpListener != null) _tcpListener.Stop();
+                    _tcpListener = null;
+
+                    // Add local end point to exception data.
+                    if (exSocket.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                        exSocket.Data.Add("localEndPoint", localEP);
+
+                    throw exSocket;
+                }
             }
         }
 

@@ -1,17 +1,31 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.ServiceProcess;
 using System.Text;
+
+using SshDotNet;
+using SshDotNet.Algorithms;
 
 namespace WindowsSshServer
 {
     public partial class SshService : ServiceBase
     {
+        protected const string _keysDir = @"../../../Keys/"; // Directory from which to load host keys.
+
         public static new string ServiceName
         {
             get { return "WindowsSshServer"; }
+        }
+
+        protected static string GetAssemblyProductName()
+        {
+            return ((AssemblyProductAttribute)(System.Reflection.Assembly.GetExecutingAssembly()
+                .GetCustomAttributes(typeof(AssemblyProductAttribute), false))[0]).Product;
         }
 
         protected SshTcpServer _tcpServer; // TCP server for SSH connections.
@@ -21,6 +35,8 @@ namespace WindowsSshServer
         {
             // Create TCP server.
             _tcpServer = new SshTcpServer();
+            _tcpServer.ClientConnected += new EventHandler<ClientConnectedEventArgs>(
+                _tcpServer_ClientConnected);
 
             this.Disposed += new EventHandler(SshServerService_Disposed);
         }
@@ -81,6 +97,65 @@ namespace WindowsSshServer
             //
 
             base.OnCustomCommand(command);
+        }
+
+
+        private void Client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
+        {
+            // Load host key for chosen algorithm.
+            if (e.HostKeyAlgorithm is SshDss)
+            {
+                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
+                    FileMode.Open, FileAccess.Read))
+                    e.HostKeyAlgorithm.ImportKey(fileStream);
+            }
+            else if (e.HostKeyAlgorithm is SshRsa)
+            {
+                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"rsa-default.key"),
+                    FileMode.Open, FileAccess.Read))
+                    e.HostKeyAlgorithm.ImportKey(fileStream);
+            }
+
+            //MessageBox.Show(new SshPublicKey(e.HostKeyAlgorithm).GetFingerprint());
+        }
+
+        private void authService_AuthenticateUserPublicKey(object sender, AuthenticateUserPublicKeyEventArgs e)
+        {
+            e.Result = AuthenticationResult.Success;
+        }
+
+        private void authService_AuthenticateUserPassword(object sender, AuthenticateUserPasswordEventArgs e)
+        {
+            e.Result = AuthenticationResult.Success;
+            //e.Result = AuthenticationResult.PasswordExpired;
+        }
+
+        private void authService_AuthenticateUserHostBased(object sender, AuthenticateUserHostBasedEventArgs e)
+        {
+            e.Result = AuthenticationResult.Success;
+        }
+
+        private void authService_ChangePassword(object sender, ChangePasswordEventArgs e)
+        {
+            e.Result = PasswordChangeResult.Failure;
+        }
+
+        private void _tcpServer_ClientConnected(object sender, ClientConnectedEventArgs e)
+        {
+            var authService = e.Client.AuthenticationService;
+
+            e.Client.KeyExchangeInitialized += new EventHandler<SshKeyExchangeInitializedEventArgs>(
+                Client_KeyExchangeCompleted);
+
+            authService.BannerMessage = GetAssemblyProductName() + "\r\n";
+            authService.AuthenticateUserPublicKey += new EventHandler<AuthenticateUserPublicKeyEventArgs>(
+                authService_AuthenticateUserPublicKey);
+            authService.AuthenticateUserPassword += new EventHandler<AuthenticateUserPasswordEventArgs>(
+                authService_AuthenticateUserPassword);
+            authService.AuthenticateUserHostBased += new EventHandler<AuthenticateUserHostBasedEventArgs>(
+                authService_AuthenticateUserHostBased);
+            authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
+                authService_ChangePassword);
         }
 
         private void SshServerService_Disposed(object sender, EventArgs e)

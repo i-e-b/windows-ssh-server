@@ -13,9 +13,22 @@ namespace WindowsSshServer
         [STAThread]
         static void Main()
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new MainForm());
+            // Check if application is running as service.
+            if (Environment.UserName == "SYSTEM")
+            {
+                // Run service.
+                using (var service = new SshService())
+                {
+                    System.ServiceProcess.ServiceBase.Run(service);
+                }
+            }
+            else
+            {
+                // Run user interface.
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new MainForm());
+            }
         }
     }
 }

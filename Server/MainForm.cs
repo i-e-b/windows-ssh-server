@@ -5,6 +5,8 @@ using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
@@ -27,71 +29,10 @@ namespace WindowsSshServer
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            // Create TCP server.
             _server = new SshTcpServer();
-
-            _server.ClientConnected += new EventHandler<ClientConnectedEventArgs>(_server_ClientConnected);
 
             // Start server immediately.
             startButton.PerformClick();
-        }
-
-        private void _server_ClientConnected(object sender, ClientConnectedEventArgs e)
-        {
-            var authService = e.Client.AuthenticationService;
-
-            e.Client.KeyExchangeInitialized += new EventHandler<SshKeyExchangeInitializedEventArgs>(
-                Client_KeyExchangeCompleted);
-
-            authService.BannerMessage = Application.ProductName + "\r\n";
-            authService.AuthenticateUserPublicKey += new EventHandler<AuthenticateUserPublicKeyEventArgs>(
-                authService_AuthenticateUserPublicKey);
-            authService.AuthenticateUserPassword += new EventHandler<AuthenticateUserPasswordEventArgs>(
-                authService_AuthenticateUserPassword);
-            authService.AuthenticateUserHostBased += new EventHandler<AuthenticateUserHostBasedEventArgs>(
-                authService_AuthenticateUserHostBased);
-            authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
-                authService_ChangePassword);
-        }
-
-        private void Client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
-        {
-            // Load host key for chosen algorithm.
-            if (e.HostKeyAlgorithm is SshDss)
-            {
-                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
-                    FileMode.Open, FileAccess.Read))
-                    e.HostKeyAlgorithm.ImportKey(fileStream);
-            }
-            else if (e.HostKeyAlgorithm is SshRsa)
-            {
-                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"rsa-default.key"),
-                    FileMode.Open, FileAccess.Read))
-                    e.HostKeyAlgorithm.ImportKey(fileStream);
-            }
-
-            //MessageBox.Show(new SshPublicKey(e.HostKeyAlgorithm).GetFingerprint());
-        }
-
-        private void authService_AuthenticateUserPublicKey(object sender, AuthenticateUserPublicKeyEventArgs e)
-        {
-            e.Result = AuthenticationResult.Success;
-        }
-
-        private void authService_AuthenticateUserPassword(object sender, AuthenticateUserPasswordEventArgs e)
-        {
-            e.Result = AuthenticationResult.Success;
-            //e.Result = AuthenticationResult.PasswordExpired;
-        }
-
-        private void authService_AuthenticateUserHostBased(object sender, AuthenticateUserHostBasedEventArgs e)
-        {
-            e.Result = AuthenticationResult.Success;
-        }
-
-        private void authService_ChangePassword(object sender, ChangePasswordEventArgs e)
-        {
-            e.Result = PasswordChangeResult.Failure;
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
@@ -101,11 +42,30 @@ namespace WindowsSshServer
 
         private void startButton_Click(object sender, EventArgs e)
         {
-            _server.Start();
+            try
+            {
+                // Start server, listening for incoming connections.
+                _server.Start();
+            }
+            catch (SocketException exSocket)
+            {
+                if (exSocket.SocketErrorCode == SocketError.AddressAlreadyInUse)
+                {
+                    MessageBox.Show(string.Format("The server cannot listen on port {0} because it is " +
+                        "already in use by another program.", ((IPEndPoint)exSocket.Data["localEndPoint"])
+                        .Port),
+                        Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                else
+                {
+                    throw exSocket;
+                }
+            }
         }
 
         private void stopButton_Click(object sender, EventArgs e)
         {
+            // Stop server, closing all open connections.
             _server.Stop();
             _server.CloseAllConnections();
         }

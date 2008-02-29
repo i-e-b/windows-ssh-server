@@ -129,7 +129,6 @@ namespace SshDotNet
 
                 if (data != null) msgWriter.Write(data);
 
-                // Send Global Request message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -148,7 +147,6 @@ namespace SshDotNet
 
                 //
 
-                // Send Channel Open Confirmation message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -172,7 +170,6 @@ namespace SshDotNet
                 msgWriter.WriteByteString(Encoding.UTF8.GetBytes(description));
                 msgWriter.Write(language);
 
-                // Send Channel Open Failure message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -192,7 +189,6 @@ namespace SshDotNet
                 // Write channel number.
                 msgWriter.Write(channel.RecipientChannel);
 
-                // Send Channel EOF message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -212,7 +208,6 @@ namespace SshDotNet
                 // Write channel number.
                 msgWriter.Write(channel.RecipientChannel);
 
-                // Send Channel Close message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }

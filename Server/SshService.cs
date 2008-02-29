@@ -38,14 +38,22 @@ namespace WindowsSshServer
             _tcpServer.ClientConnected += new EventHandler<ClientConnectedEventArgs>(
                 _tcpServer_ClientConnected);
 
+            // Note: need to set in code for Pause to be enabled.
+            this.CanPauseAndContinue = true;
+            
             this.Disposed += new EventHandler(SshServerService_Disposed);
+        }
+
+        public SshTcpServer TcpServer
+        {
+            get { return _tcpServer; }
         }
 
         protected override void OnStart(string[] args)
         {
             // Start TCP server.
             _tcpServer.Start();
-            
+
             base.OnStart(args);
         }
 
@@ -140,6 +148,13 @@ namespace WindowsSshServer
             e.Result = PasswordChangeResult.Failure;
         }
 
+        private void authService_RequestPromptInfo(object sender, RequestPromptInfoEventArgs e)
+        {
+            e.Name = "Custom Auth Method";
+            e.Instruction = "Enter your password.";
+            e.Prompts = new[] { new AuthenticationPrompt("Password: ", true) };
+        }
+
         private void _tcpServer_ClientConnected(object sender, ClientConnectedEventArgs e)
         {
             var authService = e.Client.AuthenticationService;
@@ -156,6 +171,8 @@ namespace WindowsSshServer
                 authService_AuthenticateUserHostBased);
             authService.ChangePassword += new EventHandler<ChangePasswordEventArgs>(
                 authService_ChangePassword);
+            authService.RequestPromptInfo += new EventHandler<RequestPromptInfoEventArgs>(
+                authService_RequestPromptInfo);
         }
 
         private void SshServerService_Disposed(object sender, EventArgs e)

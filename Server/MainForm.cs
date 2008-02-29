@@ -20,7 +20,7 @@ namespace WindowsSshServer
     {
         protected const string _keysDir = @"../../../Keys/"; // Directory from which to load host keys.
 
-        protected SshTcpServer _server; // TCP server for SSH clients.
+        protected SshService _service; // Service object for server.
 
         public MainForm()
         {
@@ -29,7 +29,7 @@ namespace WindowsSshServer
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            _server = new SshTcpServer();
+            _service = new SshService();
 
             // Start server immediately.
             startButton.PerformClick();
@@ -37,7 +37,7 @@ namespace WindowsSshServer
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
-            _server.Dispose();
+            _service.Dispose();
         }
 
         private void startButton_Click(object sender, EventArgs e)
@@ -45,7 +45,7 @@ namespace WindowsSshServer
             try
             {
                 // Start server, listening for incoming connections.
-                _server.Start();
+                _service.TcpServer.Start();
             }
             catch (SocketException exSocket)
             {
@@ -66,8 +66,8 @@ namespace WindowsSshServer
         private void stopButton_Click(object sender, EventArgs e)
         {
             // Stop server, closing all open connections.
-            _server.Stop();
-            _server.CloseAllConnections();
+            _service.TcpServer.Stop();
+            _service.TcpServer.CloseAllConnections();
         }
 
         private void generateKeysButton_Click(object sender, EventArgs e)
@@ -88,11 +88,11 @@ namespace WindowsSshServer
 
         private void updateStatusTimer_Tick(object sender, EventArgs e)
         {
-            startButton.Enabled = !_server.IsRunning;
-            stopButton.Enabled = _server.IsRunning;
+            startButton.Enabled = !_service.TcpServer.IsRunning;
+            stopButton.Enabled = _service.TcpServer.IsRunning;
 
-            statusLabel.Text = _server.IsRunning ? "Running" : "Stopped";
-            clientCountLabel.Text = string.Format("{0} clients", _server.Clients.Count);
+            statusLabel.Text = _service.TcpServer.IsRunning ? "Running" : "Stopped";
+            clientCountLabel.Text = string.Format("{0} clients", _service.TcpServer.Clients.Count);
         }
     }
 }

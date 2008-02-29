@@ -35,7 +35,7 @@ namespace WindowsSshServer
 
             this.Installers.Add(serviceProcInstaller);
         }
-
+        
         public override void Install(System.Collections.IDictionary stateSaver)
         {
             base.Install(stateSaver);

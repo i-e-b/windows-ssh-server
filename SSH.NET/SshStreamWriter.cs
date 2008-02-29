@@ -94,6 +94,21 @@ namespace SshDotNet
             _stream.WriteByte(Encoding.ASCII.GetBytes(new char[] { value })[0]);
         }
 
+        public void Write(short value)
+        {
+            Write(unchecked((ushort)value));
+        }
+
+        public void Write(int value)
+        {
+            Write(unchecked((uint)value));
+        }
+
+        public void Write(long value)
+        {
+            Write(unchecked((ulong)value));
+        }
+
         public void Write(ushort value)
         {
             byte[] buffer = new byte[2];

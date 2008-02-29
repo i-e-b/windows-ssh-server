@@ -93,6 +93,21 @@ namespace SshDotNet
             return Encoding.ASCII.GetChars(new byte[] { (byte)num })[0];
         }
 
+        public short ReadInt16()
+        {
+            return unchecked((short)ReadUInt16());
+        }
+
+        public int ReadInt32()
+        {
+            return unchecked((int)ReadUInt32());
+        }
+
+        public long ReadInt64()
+        {
+            return unchecked((long)ReadUInt64());
+        }
+
         public ushort ReadUInt16()
         {
             return (ushort)((ReadByte() << 8) | ReadByte());

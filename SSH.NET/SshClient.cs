@@ -750,8 +750,6 @@ namespace SshDotNet
 
         protected void DisposeCurrentAlgorithms()
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             // Dispose all current algorithms
             if (_kexAlg != null)
             {
@@ -862,7 +860,6 @@ namespace SshDotNet
                     msgWriter.WriteByteString(signatureData);
                 }
 
-                // Send Kex Diffie-Hellman Init message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -897,7 +894,6 @@ namespace SshDotNet
                     msgWriter.Write(language);
                 }
 
-                // Send Disconnect message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -921,7 +917,6 @@ namespace SshDotNet
                     msgWriter.WriteByteString(data);
                 }
 
-                // Send Ignore message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -942,7 +937,6 @@ namespace SshDotNet
                     msgWriter.Write(_receivePacketSeqNumber);
                 }
 
-                // Send Unimplemented message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -997,7 +991,6 @@ namespace SshDotNet
                     msgWriter.Write(0u);
                 }
 
-                // Send Kex Initialization message.
                 _serverKexInitPayload = msgStream.ToArray();
                 SendPacket(_serverKexInitPayload);
             }
@@ -1016,7 +1009,6 @@ namespace SshDotNet
                     msgWriter.Write((byte)SshMessage.NewKeys);
                 }
 
-                // Send New Keys message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -1037,7 +1029,6 @@ namespace SshDotNet
                     msgWriter.Write(serviceName);
                 }
 
-                // Send Service Accept message.
                 SendPacket(msgStream.ToArray());
             }
         }
@@ -1191,7 +1182,7 @@ namespace SshDotNet
             // Generate keys from shared secret and exchange hash.
             GenerateKeys(sharedSecret);
 
-            // Send Diffie-Hellman Reply message.
+            // Send Diffie-Hellman reply message.
             SendMsgKexDhReply(hostKeyAndCerts, clientExchangeValue, serverExchangeValue);
 
             // Send New Keys message to start using new keys.

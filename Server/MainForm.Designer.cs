@@ -85,7 +85,8 @@
             // 
             // generateKeysButton
             // 
-            this.generateKeysButton.Location = new System.Drawing.Point(12, 70);
+            this.generateKeysButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
+            this.generateKeysButton.Location = new System.Drawing.Point(12, 89);
             this.generateKeysButton.Name = "generateKeysButton";
             this.generateKeysButton.Size = new System.Drawing.Size(150, 23);
             this.generateKeysButton.TabIndex = 2;

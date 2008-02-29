@@ -13,7 +13,10 @@ namespace SshDotNet
         public event EventHandler<AuthenticateUserPublicKeyEventArgs> AuthenticateUserPublicKey;
         public event EventHandler<AuthenticateUserPasswordEventArgs> AuthenticateUserPassword;
         public event EventHandler<AuthenticateUserHostBasedEventArgs> AuthenticateUserHostBased;
+        public event EventHandler<AuthenticateUserKeyboardInteractiveEventArgs>
+            AuthenticateUserKeyboardInteractive;
         public event EventHandler<ChangePasswordEventArgs> ChangePassword;
+        public event EventHandler<RequestPromptInfoEventArgs> RequestPromptInfo;
         public event EventHandler<EventArgs> UserAuthenticated;
 
         protected DateTime _startTime;       // Date/time at which service was started.
@@ -143,6 +146,9 @@ namespace SshDotNet
                         case SshAuthenticationMessage.Request:
                             ProcessMsgUserAuthRequest(msgReader);
                             break;
+                        case SshAuthenticationMessage.InfoResponse:
+                            ProcessMsgUserInfoResponse(msgReader);
+                            break;
                         // Unrecognised message
                         default:
                             return false;
@@ -170,26 +176,6 @@ namespace SshDotNet
             }
         }
 
-        protected void SendMsgUserAuthInfoResponse()
-        {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-            // Create message to send.
-            using (var msgStream = new MemoryStream())
-            {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    // Write message ID.
-                    msgWriter.Write((byte)SshAuthenticationMessage.InfoResponse);
-
-                    //
-                }
-
-                // Send User Auth Info Response message.
-                _client.SendPacket(msgStream.ToArray());
-            }
-        }
-
         protected void SendMsgUserAuthSuccess()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -203,7 +189,6 @@ namespace SshDotNet
                     msgWriter.Write((byte)SshAuthenticationMessage.Success);
                 }
 
-                // Send User Auth Success message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -225,7 +210,6 @@ namespace SshDotNet
                     msgWriter.Write(partialSuccess);
                 }
 
-                // Send User Auth Failure message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -247,29 +231,6 @@ namespace SshDotNet
                     msgWriter.Write(language);
                 }
 
-                // Send User Auth Banner message.
-                _client.SendPacket(msgStream.ToArray());
-            }
-        }
-
-        protected void SendMsgUserAuthPasswdChangeReq(string prompt, string language)
-        {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-            // Create message to send.
-            using (var msgStream = new MemoryStream())
-            {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    // Write message ID.
-                    msgWriter.Write((byte)SshAuthenticationMessage.PasswordChangeRequired);
-
-                    // Write banner information.
-                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt));
-                    msgWriter.Write(language);
-                }
-
-                // Send User Auth Password Change Required message.
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -291,7 +252,57 @@ namespace SshDotNet
                     msgWriter.WriteByteString(keyBlob);
                 }
 
-                // Send User Auth Public Key OK message.
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
+        protected void SendMsgUserAuthPasswdChangeReq(string prompt, string language)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                using (var msgWriter = new SshStreamWriter(msgStream))
+                {
+                    // Write message ID.
+                    msgWriter.Write((byte)SshAuthenticationMessage.PasswordChangeRequired);
+
+                    // Write banner information.
+                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt));
+                    msgWriter.Write(language);
+                }
+
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
+        protected void SendMsgUserAuthInfoRequest(string name, string instruction, IList<AuthenticationPrompt> prompts)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                using (var msgWriter = new SshStreamWriter(msgStream))
+                {
+                    // Write message ID.
+                    msgWriter.Write((byte)SshAuthenticationMessage.InfoRequest);
+
+                    // Write request info.
+                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(name));
+                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(instruction));
+                    msgWriter.Write(""); // language tag (deprecated)
+                    msgWriter.Write(prompts.Count);
+
+                    // Write info for each prompt.
+                    foreach (var prompt in prompts)
+                    {
+                        msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt.Prompt));
+                        msgWriter.Write(prompt.Echo);
+                    }
+                }
+
                 _client.SendPacket(msgStream.ToArray());
             }
         }
@@ -619,6 +630,40 @@ namespace SshDotNet
             string[] subMethods = Encoding.UTF8.GetString(msgReader.ReadByteString()).Split(
                 new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
 
+            // Raise event to get prompt info.
+            var reqPromptInfoEventArgs = new RequestPromptInfoEventArgs();
+
+            if (RequestPromptInfo != null) RequestPromptInfo(this, reqPromptInfoEventArgs);
+
+            if (reqPromptInfoEventArgs.NoAuthRequired)
+            {
+                // Auth has succeeded.
+                AuthenticateUser(userName);
+            }
+            if (reqPromptInfoEventArgs.Prompts != null)
+            {
+                // Send Info Request message.
+                SendMsgUserAuthInfoRequest(reqPromptInfoEventArgs.Name, reqPromptInfoEventArgs.Instruction,
+                    reqPromptInfoEventArgs.Prompts);
+            }
+            else
+            {
+                // No prompts were provided.
+                SendMsgUserAuthFailure(false);
+            }
+        }
+
+        protected void ProcessMsgUserInfoResponse(SshStreamReader msgReader)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Read response info.
+            int numResponses = msgReader.ReadInt32();
+            string[] responses = new string[numResponses];
+
+            for (int i = 0; i < numResponses; i++)
+                responses[i] = Encoding.UTF8.GetString(msgReader.ReadByteString());
+
             //
         }
 
@@ -770,6 +815,19 @@ namespace SshDotNet
         }
     }
 
+    public class AuthenticateUserKeyboardInteractiveEventArgs : AuthenticateUserEventArgs
+    {
+        public AuthenticateUserKeyboardInteractiveEventArgs(string userName, string clientHostName)
+            : base(userName)
+        {
+        }
+
+        public override AuthenticationMethod AuthMethod
+        {
+            get { return AuthenticationMethod.KeyboardInteractive; }
+        }
+    }
+
     public abstract class AuthenticateUserEventArgs : EventArgs
     {
         public AuthenticateUserEventArgs(string userName)
@@ -830,7 +888,54 @@ namespace SshDotNet
             set;
         }
     }
+
+    public class RequestPromptInfoEventArgs : EventArgs
+    {
+        public RequestPromptInfoEventArgs()
+        {
+            this.Name = null;
+            this.Instruction = null;
+            this.Prompts = null;
+            this.NoAuthRequired = false;
+        }
+
+        public bool NoAuthRequired
+        {
+            get;
+            set;
+        }
+
+        public string Name
+        {
+            get;
+            set;
+        }
+
+        public string Instruction
+        {
+            get;
+            set;
+        }
+
+        public IList<AuthenticationPrompt> Prompts
+        {
+            get;
+            set;
+        }
+    }
     #endregion
+
+    public struct AuthenticationPrompt
+    {
+        public string Prompt;
+        public bool Echo;
+
+        public AuthenticationPrompt(string prompt, bool echo)
+        {
+            this.Prompt = prompt;
+            this.Echo = echo;
+        }
+    }
 
     public enum AuthenticationResult
     {
@@ -865,7 +970,7 @@ namespace SshDotNet
         Banner = 53,
         PublicKeyOk = 60,
         PasswordChangeRequired = 60,
-        InfoRequest = 61,
-        InfoResponse = 62
+        InfoRequest = 60,
+        InfoResponse = 61
     }
 }

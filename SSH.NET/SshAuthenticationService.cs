@@ -9,32 +9,46 @@ namespace SshDotNet
 {
     public class SshAuthenticationService : SshService
     {
-        public event EventHandler<AuthenticateUserNoMethodEventArgs> AuthenticateUserNoMethod;
-        public event EventHandler<AuthenticateUserPublicKeyEventArgs> AuthenticateUserPublicKey;
-        public event EventHandler<AuthenticateUserPasswordEventArgs> AuthenticateUserPassword;
-        public event EventHandler<AuthenticateUserHostBasedEventArgs> AuthenticateUserHostBased;
-        public event EventHandler<AuthenticateUserKeyboardInteractiveEventArgs>
+        public static AuthenticationMethod[] AllAuthMethods
+        {
+            get
+            {
+                return new[] {
+                    AuthenticationMethod.PublicKey,
+                    AuthenticationMethod.Password, 
+                    AuthenticationMethod.HostBased,
+                    AuthenticationMethod.KeyboardInteractive
+                };
+            }
+        }
+
+        public event EventHandler<AuthUserNoMethodEventArgs> AuthenticateUserNoMethod;
+        public event EventHandler<AuthUserPublicKeyEventArgs> AuthenticateUserPublicKey;
+        public event EventHandler<AuthUserPasswordEventArgs> AuthenticateUserPassword;
+        public event EventHandler<AuthUserHostBasedEventArgs> AuthenticateUserHostBased;
+        public event EventHandler<AuthUserKeyboardInteractiveEventArgs>
             AuthenticateUserKeyboardInteractive;
         public event EventHandler<ChangePasswordEventArgs> ChangePassword;
-        public event EventHandler<RequestPromptInfoEventArgs> RequestPromptInfo;
+        public event EventHandler<PromptInfoRequestedEventArgs> PromptInfoRequested;
         public event EventHandler<EventArgs> UserAuthenticated;
 
-        protected DateTime _startTime;       // Date/time at which service was started.
-        protected Timer _authTimeoutTimer;   // Timer to detect when authentication has timed out.
-        protected bool _bannerMsgSent;       // True if banner message has already been sent.
-        protected List<AuthenticationMethod>
-            _authMethods;                    // List of allowed authentication methods (can change over time).
-        protected int _failedAuthAttempts;   // Number of failed authentication attempts made so far.
+        protected string _lastUserName;       // Last user name used for auth.
+        protected string _lastServiceName;    // Last service name used for auth.
 
-        private bool _isDisposed = false;    // True if object has been disposed.
+        protected DateTime _startTime;        // Date/time at which service was started.
+        protected Timer _authTimeoutTimer;    // Timer to detect when authentication has timed out.
+        protected bool _bannerMsgSent;        // True if banner message has already been sent.
+        protected IList<AuthenticationMethod>
+            _authMethods;                     // List of allowed authentication methods (can change over time).
+        protected int _failedAuthAttempts;    // Number of failed authentication attempts made so far.
+
+        private bool _isDisposed = false;     // True if object has been disposed.
 
         public SshAuthenticationService(SshClient client)
             : base(client)
         {
             _bannerMsgSent = false;
-            _authMethods = new List<AuthenticationMethod>() { AuthenticationMethod.PublicKey,
-                AuthenticationMethod.Password, AuthenticationMethod.HostBased, 
-                AuthenticationMethod.KeyboardInteractive };
+            _authMethods = SshAuthenticationService.AllAuthMethods;
             _failedAuthAttempts = 0;
 
             // Initialize properties to default values.
@@ -67,9 +81,10 @@ namespace SshDotNet
             }
         }
 
-        public List<AuthenticationMethod> AllowedAuthMethods
+        public IList<AuthenticationMethod> AllowedAuthMethods
         {
             get { return _authMethods; }
+            set { _authMethods = value; }
         }
 
         public TimeSpan Timeout
@@ -316,6 +331,10 @@ namespace SshDotNet
             string serviceName = msgReader.ReadString();
             string methodName = msgReader.ReadString();
 
+            // Store user name and service name used for this auth.
+            _lastUserName = userName;
+            _lastServiceName = serviceName;
+
             // Check if service with specified name exists.
             if (_client.Services.Count(item => item.Name == serviceName) == 0)
             {
@@ -329,19 +348,19 @@ namespace SshDotNet
             switch (methodName)
             {
                 case "none":
-                    ProcessMsgUserAuthRequestNone(userName, serviceName, msgReader);
+                    ProcessMsgUserAuthRequestNone(msgReader);
                     break;
                 case "publickey":
-                    ProcessMsgUserAuthRequestPublicKey(userName, serviceName, msgReader);
+                    ProcessMsgUserAuthRequestPublicKey(msgReader);
                     break;
                 case "password":
-                    ProcessMsgUserAuthRequestPassword(userName, serviceName, msgReader);
+                    ProcessMsgUserAuthRequestPassword(msgReader);
                     break;
                 case "hostbased":
-                    ProcessMsgUserAuthRequestHostBased(userName, serviceName, msgReader);
+                    ProcessMsgUserAuthRequestHostBased(msgReader);
                     break;
                 case "keyboard-interactive":
-                    ProcessMsgUserAuthRequestKeyboardInteractive(userName, serviceName, msgReader);
+                    ProcessMsgUserAuthRequestKeyboardInteractive(msgReader);
                     break;
                 default:
                     // Invalid auth method.
@@ -350,13 +369,12 @@ namespace SshDotNet
             }
         }
 
-        protected void ProcessMsgUserAuthRequestNone(string userName, string serviceName,
-            SshStreamReader msgReader)
+        protected void ProcessMsgUserAuthRequestNone(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             // Raise event to get result of auth attempt.
-            var authUserEventArgs = new AuthenticateUserNoMethodEventArgs(userName);
+            var authUserEventArgs = new AuthUserNoMethodEventArgs(_lastUserName);
 
             if (AuthenticateUserNoMethod != null) AuthenticateUserNoMethod(this, authUserEventArgs);
 
@@ -365,7 +383,7 @@ namespace SshDotNet
             {
                 case AuthenticationResult.Success:
                     // Auth has succeeded.
-                    AuthenticateUser(serviceName);
+                    AuthenticateUser(_lastServiceName);
 
                     break;
                 case AuthenticationResult.Failure:
@@ -376,8 +394,7 @@ namespace SshDotNet
             }
         }
 
-        protected void ProcessMsgUserAuthRequestPublicKey(string userName, string serviceName,
-            SshStreamReader msgReader)
+        protected void ProcessMsgUserAuthRequestPublicKey(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -418,7 +435,7 @@ namespace SshDotNet
                    signatureData.Length - 4, signature))
                 {
                     // Raise event to get result of auth attempt.
-                    var authUserEventArgs = new AuthenticateUserPublicKeyEventArgs(userName,
+                    var authUserEventArgs = new AuthUserPublicKeyEventArgs(_lastUserName,
                         keyAlg.ExportPublicKey());
 
                     AuthenticateUserPublicKey(this, authUserEventArgs);
@@ -428,7 +445,7 @@ namespace SshDotNet
                     {
                         case AuthenticationResult.Success:
                             // Auth has succeeded.
-                            AuthenticateUser(serviceName);
+                            AuthenticateUser(_lastServiceName);
 
                             break;
                         case AuthenticationResult.FurtherAuthRequired:
@@ -456,8 +473,7 @@ namespace SshDotNet
             }
         }
 
-        protected void ProcessMsgUserAuthRequestPassword(string userName, string serviceName,
-            SshStreamReader msgReader)
+        protected void ProcessMsgUserAuthRequestPassword(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -480,7 +496,7 @@ namespace SshDotNet
                 {
                     case PasswordChangeResult.Success:
                         // Password change and auth have succeeded.
-                        AuthenticateUser(serviceName);
+                        AuthenticateUser(_lastServiceName);
 
                         break;
                     case PasswordChangeResult.FurtherAuthRequired:
@@ -506,7 +522,7 @@ namespace SshDotNet
                 string password = Encoding.UTF8.GetString(msgReader.ReadByteString());
 
                 // Raise event to get result of auth attempt.
-                var authUserEventArgs = new AuthenticateUserPasswordEventArgs(userName, password);
+                var authUserEventArgs = new AuthUserPasswordEventArgs(_lastUserName, password);
 
                 if (AuthenticateUserPassword != null) AuthenticateUserPassword(this, authUserEventArgs);
 
@@ -515,7 +531,7 @@ namespace SshDotNet
                 {
                     case AuthenticationResult.Success:
                         // Auth has succeeded.
-                        AuthenticateUser(serviceName);
+                        AuthenticateUser(_lastServiceName);
 
                         break;
                     case AuthenticationResult.FurtherAuthRequired:
@@ -549,8 +565,7 @@ namespace SshDotNet
             }
         }
 
-        protected void ProcessMsgUserAuthRequestHostBased(string userName, string serviceName,
-            SshStreamReader msgReader)
+        protected void ProcessMsgUserAuthRequestHostBased(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -588,7 +603,7 @@ namespace SshDotNet
                 signatureData.Length - 4, signature))
             {
                 // Raise event to get result of auth attempt.
-                var authUserEventArgs = new AuthenticateUserHostBasedEventArgs(userName, clientHostName,
+                var authUserEventArgs = new AuthUserHostBasedEventArgs(_lastUserName, clientHostName,
                     clientUserName, keyAlg.ExportPublicKey());
 
                 if (AuthenticateUserHostBased != null) AuthenticateUserHostBased(this, authUserEventArgs);
@@ -598,7 +613,7 @@ namespace SshDotNet
                 {
                     case AuthenticationResult.Success:
                         // Auth has succeeded.
-                        AuthenticateUser(serviceName);
+                        AuthenticateUser(_lastServiceName);
 
                         break;
                     case AuthenticationResult.FurtherAuthRequired:
@@ -620,8 +635,7 @@ namespace SshDotNet
             }
         }
 
-        protected void ProcessMsgUserAuthRequestKeyboardInteractive(string userName, string serviceName,
-            SshStreamReader msgReader)
+        protected void ProcessMsgUserAuthRequestKeyboardInteractive(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -630,27 +644,8 @@ namespace SshDotNet
             string[] subMethods = Encoding.UTF8.GetString(msgReader.ReadByteString()).Split(
                 new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
 
-            // Raise event to get prompt info.
-            var reqPromptInfoEventArgs = new RequestPromptInfoEventArgs();
-
-            if (RequestPromptInfo != null) RequestPromptInfo(this, reqPromptInfoEventArgs);
-
-            if (reqPromptInfoEventArgs.NoAuthRequired)
-            {
-                // Auth has succeeded.
-                AuthenticateUser(userName);
-            }
-            if (reqPromptInfoEventArgs.Prompts != null)
-            {
-                // Send Info Request message.
-                SendMsgUserAuthInfoRequest(reqPromptInfoEventArgs.Name, reqPromptInfoEventArgs.Instruction,
-                    reqPromptInfoEventArgs.Prompts);
-            }
-            else
-            {
-                // No prompts were provided.
-                SendMsgUserAuthFailure(false);
-            }
+            // Request prompt info from client.
+            RequestPromptInfo();
         }
 
         protected void ProcessMsgUserInfoResponse(SshStreamReader msgReader)
@@ -664,7 +659,62 @@ namespace SshDotNet
             for (int i = 0; i < numResponses; i++)
                 responses[i] = Encoding.UTF8.GetString(msgReader.ReadByteString());
 
-            //
+            // Raise event to get result of auth attempt.
+            var authUserEventArgs = new AuthUserKeyboardInteractiveEventArgs(_lastUserName,
+                responses);
+
+            if (AuthenticateUserKeyboardInteractive != null) AuthenticateUserKeyboardInteractive(this,
+                authUserEventArgs);
+
+            // Check result of auth attempt.
+            switch (authUserEventArgs.Result)
+            {
+                case AuthenticationResult.Success:
+                    // Auth has succeeded.
+                    AuthenticateUser(_lastServiceName);
+
+                    break;
+                case AuthenticationResult.FurtherAuthRequired:
+                    // Auth has succeeded, but further auth is required.
+                    SendMsgUserAuthFailure(true);
+
+                    break;
+                case AuthenticationResult.Failure:
+                    // Auth has failed.
+                    SendMsgUserAuthFailure(false);
+
+                    break;
+                case AuthenticationResult.RequestMoreInfo:
+                    // Request more prompt info from client.
+                    RequestPromptInfo();
+
+                    break;
+            }
+        }
+
+        protected void RequestPromptInfo()
+        {
+            // Raise event to get prompt info.
+            var reqPromptInfoEventArgs = new PromptInfoRequestedEventArgs();
+
+            if (PromptInfoRequested != null) PromptInfoRequested(this, reqPromptInfoEventArgs);
+
+            if (reqPromptInfoEventArgs.NoAuthRequired)
+            {
+                // Auth has succeeded.
+                AuthenticateUser(_lastUserName);
+            }
+            if (reqPromptInfoEventArgs.Prompts != null)
+            {
+                // Send Info Request message.
+                SendMsgUserAuthInfoRequest(reqPromptInfoEventArgs.Name, reqPromptInfoEventArgs.Instruction,
+                    reqPromptInfoEventArgs.Prompts);
+            }
+            else
+            {
+                // No prompts were provided.
+                SendMsgUserAuthFailure(false);
+            }
         }
 
         protected void AuthenticateUser(string requestedService)
@@ -725,9 +775,9 @@ namespace SshDotNet
     }
 
     #region Event Arguments Types
-    public class AuthenticateUserNoMethodEventArgs : AuthenticateUserEventArgs
+    public class AuthUserNoMethodEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserNoMethodEventArgs(string userName)
+        public AuthUserNoMethodEventArgs(string userName)
             : base(userName)
         {
         }
@@ -738,9 +788,9 @@ namespace SshDotNet
         }
     }
 
-    public class AuthenticateUserPublicKeyEventArgs : AuthenticateUserEventArgs
+    public class AuthUserPublicKeyEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserPublicKeyEventArgs(string userName, SshPublicKey publicKey)
+        public AuthUserPublicKeyEventArgs(string userName, SshPublicKey publicKey)
             : base(userName)
         {
             this.PublicKey = publicKey;
@@ -759,9 +809,9 @@ namespace SshDotNet
         }
     }
 
-    public class AuthenticateUserPasswordEventArgs : AuthenticateUserEventArgs
+    public class AuthUserPasswordEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserPasswordEventArgs(string userName, string password)
+        public AuthUserPasswordEventArgs(string userName, string password)
             : base(userName)
         {
             this.Password = password;
@@ -780,9 +830,9 @@ namespace SshDotNet
         }
     }
 
-    public class AuthenticateUserHostBasedEventArgs : AuthenticateUserEventArgs
+    public class AuthUserHostBasedEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserHostBasedEventArgs(string userName, string clientHostName,
+        public AuthUserHostBasedEventArgs(string userName, string clientHostName,
             string clientUserName, SshPublicKey publicKey)
             : base(userName)
         {
@@ -815,11 +865,18 @@ namespace SshDotNet
         }
     }
 
-    public class AuthenticateUserKeyboardInteractiveEventArgs : AuthenticateUserEventArgs
+    public class AuthUserKeyboardInteractiveEventArgs : AuthenticateUserEventArgs
     {
-        public AuthenticateUserKeyboardInteractiveEventArgs(string userName, string clientHostName)
+        public AuthUserKeyboardInteractiveEventArgs(string userName, string[] responses)
             : base(userName)
         {
+            this.Responses = responses;
+        }
+
+        public string[] Responses
+        {
+            get;
+            protected set;
         }
 
         public override AuthenticationMethod AuthMethod
@@ -889,9 +946,9 @@ namespace SshDotNet
         }
     }
 
-    public class RequestPromptInfoEventArgs : EventArgs
+    public class PromptInfoRequestedEventArgs : EventArgs
     {
-        public RequestPromptInfoEventArgs()
+        public PromptInfoRequestedEventArgs()
         {
             this.Name = null;
             this.Instruction = null;
@@ -943,6 +1000,7 @@ namespace SshDotNet
         FurtherAuthRequired,
         Failure,
         PasswordExpired,
+        RequestMoreInfo,
     }
 
     public enum PasswordChangeResult

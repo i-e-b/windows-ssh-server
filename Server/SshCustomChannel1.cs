@@ -3,16 +3,18 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace SshDotNet
+using SshDotNet;
+
+namespace WindowsSshServer
 {
-    public class SshSessionChannel : SshChannel
+    public class SshCustomChannel1 : SshChannel
     {
-        public SshSessionChannel(ChannelOpenRequestEventArgs requestEventArgs)
+        public SshCustomChannel1(ChannelOpenRequestEventArgs requestEventArgs)
             : base(requestEventArgs)
         {
         }
 
-        public SshSessionChannel(uint senderChannel, uint recipientChannel, uint windowSize,
+        public SshCustomChannel1(uint senderChannel, uint recipientChannel, uint windowSize,
             uint maxPacketSize)
             : base(senderChannel, recipientChannel, windowSize, maxPacketSize)
         {

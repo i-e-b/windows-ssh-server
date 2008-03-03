@@ -11,7 +11,8 @@ namespace WindowsSshServer
 {
     public sealed class SshTcpServer : IDisposable
     {
-        public event EventHandler<ClientConnectedEventArgs> ClientConnected;
+        public event EventHandler<ClientEventArgs> ClientConnected;
+        public event EventHandler<ClientEventArgs> ClientDisconnected;
 
         private TcpListener _tcpListener; // Listens for TCP connections from clients.
         private List<SshClient> _clients; // List of connected clients.
@@ -187,23 +188,27 @@ namespace WindowsSshServer
 
         private void client_Connected(object sender, EventArgs e)
         {
+            var client = (SshClient)sender;
+
             // Raise event.
-            if (ClientConnected != null) ClientConnected(this, new ClientConnectedEventArgs(
-                (SshClient)sender));
+            if (ClientConnected != null) ClientConnected(this, new ClientEventArgs(client));
         }
 
         private void client_Disconnected(object sender, EventArgs e)
         {
-            SshClient client = (SshClient)sender;
+            var client = (SshClient)sender;
 
             // Remove client from list.
             _clients.Remove(client);
+
+            // Raise event.
+            if (ClientConnected != null) ClientDisconnected(this, new ClientEventArgs(client));
         }
     }
 
-    public class ClientConnectedEventArgs : EventArgs
+    public class ClientEventArgs : EventArgs
     {
-        public ClientConnectedEventArgs(SshClient client)
+        public ClientEventArgs(SshClient client)
         {
             this.Client = client;
         }

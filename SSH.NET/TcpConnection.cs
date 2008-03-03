@@ -11,6 +11,8 @@ namespace SshDotNet
     public class TcpConnection : IConnection
     {
         protected TcpClient _tcpClient;   // Client TCP connection.
+        protected IPEndPoint _localEp;    // Local end point.
+        protected IPEndPoint _remoteEp;   // Remote end point.
 
         private bool _isDisposed = false; // True if object has been disposed.
 
@@ -45,19 +47,24 @@ namespace SshDotNet
             _isDisposed = true;
         }
 
+        public TcpClient Client
+        {
+            get { return _tcpClient; }
+        }
+
+        public IPEndPoint LocalEndPoint
+        {
+            get { return _localEp; }
+        }
+
+        public IPEndPoint RemoteEndPoint
+        {
+            get { return _remoteEp; }
+        }
+
         public Stream GetStream()
         {
             return _tcpClient.GetStream();
-        }
-
-        public void Disconnect(bool remotely)
-        {
-            // Close network objects.
-            if (_tcpClient != null)
-            {
-                _tcpClient.Close();
-                _tcpClient = null;
-            }
         }
 
         public bool HandleException(SshClient client, Exception ex)
@@ -83,6 +90,23 @@ namespace SshDotNet
 
             // Exception was not handled.
             return false;
+        }
+
+        public void ConnectionEstablished()
+        {
+            // Store local and remote end points.
+            _localEp = (IPEndPoint)_tcpClient.Client.LocalEndPoint;
+            _remoteEp = (IPEndPoint)_tcpClient.Client.RemoteEndPoint;
+        }
+
+        public void Disconnect(bool remotely)
+        {
+            // Close network objects.
+            if (_tcpClient != null)
+            {
+                _tcpClient.Close();
+                _tcpClient = null;
+            }
         }
     }
 }

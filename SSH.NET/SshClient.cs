@@ -36,7 +36,7 @@ namespace SshDotNet
         public event EventHandler<SshKeyExchangeInitializedEventArgs> KeyExchangeInitialized;
 
         protected const string _protocolVersion = "2.0"; // Implemented version of SSH protocol.
-        protected const uint _maxPacketLength = 35000;   // Maximum total length of packet.
+        protected const uint _maxPacketSize = 35000;     // Maximum total size of packet.
 
         protected List<SshService> _services;            // List of supported services.
         protected SshService _activeService;             // Active service.
@@ -166,17 +166,16 @@ namespace SshDotNet
         {
             get
             {
-                return (SshAuthenticationService)_services.SingleOrDefault(item =>
-                    item is SshAuthenticationService);
+                return (SshAuthenticationService)_services.SingleOrDefault(item => item is
+                    SshAuthenticationService);
             }
         }
 
-        public SshAuthenticationService ConnectionService
+        public SshConnectionService ConnectionService
         {
             get
             {
-                return (SshAuthenticationService)_services.SingleOrDefault(item =>
-                    item is SshConnectionService);
+                return (SshConnectionService)_services.SingleOrDefault(item => item is SshConnectionService);
             }
         }
 
@@ -266,6 +265,16 @@ namespace SshDotNet
             set;
         }
 
+        public uint MaxPacketSize
+        {
+            get { return _maxPacketSize; }
+        }
+
+        public IConnection Connection
+        {
+            get { return _connection; }
+        }
+
         public bool IsConnected
         {
             get
@@ -314,6 +323,9 @@ namespace SshDotNet
             // Create thread on which to receive data from connection.
             _receiveThread = new Thread(new ThreadStart(ReceiveData));
             _receiveThread.Start();
+
+            // Notify connection object that connection has been established.
+            if (_connection != null) _connection.ConnectionEstablished();
 
             // Client has connected.
             OnConnected(new EventArgs());
@@ -370,6 +382,9 @@ namespace SshDotNet
             string language)
         {
             //if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Check if connection is already closed.
+            if (_stream == null) return;
 
             // Dispose objects for data transmission.
             if (_stream != null)
@@ -653,7 +668,7 @@ namespace SshDotNet
             }
 
             // Check that packet length does not exceed maximum.
-            if (4 + packetLength + mac.Length > _maxPacketLength)
+            if (4 + packetLength + mac.Length > _maxPacketSize)
             {
                 Disconnect(SshDisconnectReason.ProtocolError, "Packet length exceeds maximum.");
                 throw new DisconnectedException();
@@ -845,19 +860,10 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.KexDhReply);
-
-                    // Send server public host key and certificates.
                     msgWriter.WriteByteString(hostKeyAndCerts);
-
-                    // Write server kex value.
                     msgWriter.WriteMPint(serverExchangeValue);
-
-                    // Write signature of exchange hash.
-                    var signatureData = _hostKeyAlg.CreateSignatureData(_exchangeHash);
-
-                    msgWriter.WriteByteString(signatureData);
+                    msgWriter.WriteByteString(_hostKeyAlg.CreateSignatureData(_exchangeHash));
                 }
 
                 SendPacket(msgStream.ToArray());
@@ -866,8 +872,9 @@ namespace SshDotNet
 
         private bool CheckByteArray(byte[] serverArray, string clientArrayText)
         {
-            byte[] clientArray = (from item in clientArrayText.Split(new char[] { ' ' }, 
-                StringSplitOptions.RemoveEmptyEntries) select byte.Parse(item)).ToArray();
+            byte[] clientArray = (from item in clientArrayText.Split(new char[] { ' ' },
+                StringSplitOptions.RemoveEmptyEntries)
+                                  select byte.Parse(item)).ToArray();
 
             return serverArray.ArrayEquals(clientArray);
         }
@@ -881,16 +888,9 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.Disconnect);
-
-                    // Write reason code.
                     msgWriter.Write((uint)reason);
-
-                    // Write human-readable description of reason for disconnection.
                     msgWriter.WriteByteString(Encoding.UTF8.GetBytes(description));
-
-                    // Write language tag.
                     msgWriter.Write(language);
                 }
 
@@ -907,7 +907,6 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.Ignore);
 
                     // Write random data, which is to be ignored.
@@ -930,7 +929,6 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.Unimplemented);
 
                     // Send sequence number of unrecognised packet.
@@ -950,7 +948,6 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.KexInit);
 
                     // Write random cookie.
@@ -1005,7 +1002,6 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.NewKeys);
                 }
 
@@ -1022,10 +1018,7 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshMessage.ServiceAccept);
-
-                    // Write name of service.
                     msgWriter.Write(serviceName);
                 }
 
@@ -1660,7 +1653,7 @@ namespace SshDotNet
                 SendMsgKexInit();
 
                 // Read packets from network stream until connection is closed.
-                byte[] packet = new byte[_maxPacketLength];
+                byte[] packet = new byte[_maxPacketSize];
 
                 while (true)
                 {

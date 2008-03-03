@@ -94,12 +94,14 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="SshConsoleClient.cs" />
+    <Compile Include="Extensions.cs" />
     <Compile Include="SshService.Designer.cs">
       <DependentUpon>SshService.cs</DependentUpon>
     </Compile>
     <Compile Include="SshServiceInstaller.cs">
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="SshCustomChannel1.cs" />
     <Compile Include="SshTcpServer.cs" />
     <Compile Include="SshService.cs">
       <SubType>Component</SubType>

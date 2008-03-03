@@ -22,6 +22,7 @@ namespace SshDotNet
             }
         }
 
+        public event EventHandler<AuthMethodRequestedEventArgs> AuthenticationMethodRequested;
         public event EventHandler<AuthUserNoMethodEventArgs> AuthenticateUserNoMethod;
         public event EventHandler<AuthUserPublicKeyEventArgs> AuthenticateUserPublicKey;
         public event EventHandler<AuthUserPasswordEventArgs> AuthenticateUserPassword;
@@ -200,7 +201,6 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.Success);
                 }
 
@@ -217,11 +217,8 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.Failure);
-
-                    // Write authentication information.
-                    msgWriter.WriteNameList(this.AllowedAuthMethods.GetNames());
+                    msgWriter.WriteNameList(this.AllowedAuthMethods.GetSshNames());
                     msgWriter.Write(partialSuccess);
                 }
 
@@ -238,10 +235,7 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.Banner);
-
-                    // Write banner information.
                     msgWriter.WriteByteString(Encoding.UTF8.GetBytes(message));
                     msgWriter.Write(language);
                 }
@@ -259,7 +253,6 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.PublicKeyOk);
 
                     // Write public key information.
@@ -280,10 +273,7 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.PasswordChangeRequired);
-
-                    // Write banner information.
                     msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt));
                     msgWriter.Write(language);
                 }
@@ -301,10 +291,7 @@ namespace SshDotNet
             {
                 using (var msgWriter = new SshStreamWriter(msgStream))
                 {
-                    // Write message ID.
                     msgWriter.Write((byte)SshAuthenticationMessage.InfoRequest);
-
-                    // Write request info.
                     msgWriter.WriteByteString(Encoding.UTF8.GetBytes(name));
                     msgWriter.WriteByteString(Encoding.UTF8.GetBytes(instruction));
                     msgWriter.Write(""); // language tag (deprecated)
@@ -398,6 +385,10 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            // Raise event to specify requested auth method.
+            if (AuthenticationMethodRequested != null) AuthenticationMethodRequested(this,
+                new AuthMethodRequestedEventArgs(AuthenticationMethod.PublicKey));
+
             // Read request information.
             bool isAuthRequest = msgReader.ReadBoolean();
             string keyAlgName = msgReader.ReadString();
@@ -476,6 +467,10 @@ namespace SshDotNet
         protected void ProcessMsgUserAuthRequestPassword(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Raise event to specify requested auth method.
+            if (AuthenticationMethodRequested != null) AuthenticationMethodRequested(this,
+                new AuthMethodRequestedEventArgs(AuthenticationMethod.Password));
 
             // Check whether client is changing password.
             bool changingPassword = msgReader.ReadBoolean();
@@ -569,6 +564,10 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            // Raise event to specify requested auth method.
+            if (AuthenticationMethodRequested != null) AuthenticationMethodRequested(this,
+                new AuthMethodRequestedEventArgs(AuthenticationMethod.HostBased));
+
             // Read request information.
             string keyAlgName = msgReader.ReadString();
             byte[] keyAndCertsData = msgReader.ReadByteString();
@@ -639,13 +638,17 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            // Raise event to specify requested auth method.
+            if (AuthenticationMethodRequested != null) AuthenticationMethodRequested(this,
+                new AuthMethodRequestedEventArgs(AuthenticationMethod.KeyboardInteractive));
+
             // Read request information.
             string language = msgReader.ReadString();
             string[] subMethods = Encoding.UTF8.GetString(msgReader.ReadByteString()).Split(
                 new string[] { "," }, StringSplitOptions.RemoveEmptyEntries);
 
             // Request prompt info from client.
-            RequestPromptInfo();
+            RequestPromptInfo(subMethods);
         }
 
         protected void ProcessMsgUserInfoResponse(SshStreamReader msgReader)
@@ -686,16 +689,16 @@ namespace SshDotNet
                     break;
                 case AuthenticationResult.RequestMoreInfo:
                     // Request more prompt info from client.
-                    RequestPromptInfo();
+                    RequestPromptInfo(null);
 
                     break;
             }
         }
 
-        protected void RequestPromptInfo()
+        protected void RequestPromptInfo(string[] subMethods)
         {
             // Raise event to get prompt info.
-            var reqPromptInfoEventArgs = new PromptInfoRequestedEventArgs();
+            var reqPromptInfoEventArgs = new PromptInfoRequestedEventArgs(subMethods);
 
             if (PromptInfoRequested != null) PromptInfoRequested(this, reqPromptInfoEventArgs);
 
@@ -749,12 +752,12 @@ namespace SshDotNet
 
     public static class SshAuthenticationServiceExtensions
     {
-        public static string[] GetNames(this IEnumerable<AuthenticationMethod> methods)
+        public static string[] GetSshNames(this IEnumerable<AuthenticationMethod> methods)
         {
-            return (from m in methods select m.GetName()).ToArray();
+            return (from m in methods select m.GetSshName()).ToArray();
         }
 
-        public static string GetName(this AuthenticationMethod method)
+        public static string GetSshName(this AuthenticationMethod method)
         {
             switch (method)
             {
@@ -775,7 +778,22 @@ namespace SshDotNet
     }
 
     #region Event Arguments Types
-    public class AuthUserNoMethodEventArgs : AuthenticateUserEventArgs
+    public class AuthMethodRequestedEventArgs : EventArgs
+    {
+        public AuthMethodRequestedEventArgs(AuthenticationMethod authMethod)
+            : base()
+        {
+            this.AuthMethod = authMethod;
+        }
+
+        public AuthenticationMethod AuthMethod
+        {
+            get;
+            protected set;
+        }
+    }
+
+    public class AuthUserNoMethodEventArgs : AuthUserEventArgs
     {
         public AuthUserNoMethodEventArgs(string userName)
             : base(userName)
@@ -788,7 +806,7 @@ namespace SshDotNet
         }
     }
 
-    public class AuthUserPublicKeyEventArgs : AuthenticateUserEventArgs
+    public class AuthUserPublicKeyEventArgs : AuthUserEventArgs
     {
         public AuthUserPublicKeyEventArgs(string userName, SshPublicKey publicKey)
             : base(userName)
@@ -809,7 +827,7 @@ namespace SshDotNet
         }
     }
 
-    public class AuthUserPasswordEventArgs : AuthenticateUserEventArgs
+    public class AuthUserPasswordEventArgs : AuthUserEventArgs
     {
         public AuthUserPasswordEventArgs(string userName, string password)
             : base(userName)
@@ -830,7 +848,7 @@ namespace SshDotNet
         }
     }
 
-    public class AuthUserHostBasedEventArgs : AuthenticateUserEventArgs
+    public class AuthUserHostBasedEventArgs : AuthUserEventArgs
     {
         public AuthUserHostBasedEventArgs(string userName, string clientHostName,
             string clientUserName, SshPublicKey publicKey)
@@ -865,7 +883,7 @@ namespace SshDotNet
         }
     }
 
-    public class AuthUserKeyboardInteractiveEventArgs : AuthenticateUserEventArgs
+    public class AuthUserKeyboardInteractiveEventArgs : AuthUserEventArgs
     {
         public AuthUserKeyboardInteractiveEventArgs(string userName, string[] responses)
             : base(userName)
@@ -885,9 +903,9 @@ namespace SshDotNet
         }
     }
 
-    public abstract class AuthenticateUserEventArgs : EventArgs
+    public abstract class AuthUserEventArgs : EventArgs
     {
-        public AuthenticateUserEventArgs(string userName)
+        public AuthUserEventArgs(string userName)
         {
             this.UserName = userName;
             this.Result = AuthenticationResult.Failure;
@@ -948,8 +966,9 @@ namespace SshDotNet
 
     public class PromptInfoRequestedEventArgs : EventArgs
     {
-        public PromptInfoRequestedEventArgs()
+        public PromptInfoRequestedEventArgs(string[] subMethods)
         {
+            this.SubMethods = subMethods;
             this.Name = null;
             this.Instruction = null;
             this.Prompts = null;
@@ -978,6 +997,12 @@ namespace SshDotNet
         {
             get;
             set;
+        }
+
+        public string[] SubMethods
+        {
+            get;
+            protected set;
         }
     }
     #endregion

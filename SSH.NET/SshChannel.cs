@@ -8,24 +8,35 @@ namespace SshDotNet
 {
     public abstract class SshChannel
     {
-        //protected uint _senderChannel;    // Channel number for sender.
-        //protected uint _recipientChannel; // Channel number for recipient.
+        protected bool _eofSent; // True if EOF (end of file) message has been sent.
 
-        public SshChannel(uint senderChannel, uint recipientChannel, uint windowSize, uint maxPacketSize)
+        protected SshConnectionService _connService; // Connection service.
+        //protected uint _senderChannel;             // Channel number for sender.
+        //protected uint _recipientChannel;          // Channel number for recipient.
+
+        public SshChannel(ChannelOpenRequestEventArgs requestEventArgs)
+            : this(requestEventArgs.ClientChannel, requestEventArgs.ServerChannel,
+            requestEventArgs.InitialWindowSize, requestEventArgs.MaxPacketSize)
         {
-            this.SenderChannel = senderChannel;
-            this.RecipientChannel = recipientChannel;
+        }
+
+        public SshChannel(uint clientChannel, uint serverChannel, uint windowSize, uint maxPacketSize)
+        {
+            _eofSent = false;
+
+            this.ClientChannel = clientChannel;
+            this.ServerChannel = serverChannel;
             this.WindowSize = windowSize;
             this.MaxPacketSize = maxPacketSize;
         }
 
-        public uint SenderChannel
+        public uint ClientChannel
         {
             get;
             set;
         }
 
-        public uint RecipientChannel
+        public uint ServerChannel
         {
             get;
             set;
@@ -43,6 +54,20 @@ namespace SshDotNet
             protected set;
         }
 
-        //
+        public SshConnectionService ConnectionService
+        {
+            get { return _connService; }
+            internal set { _connService = value; }
+        }
+
+        public void SendEof()
+        {
+            _connService.SendMsgChannelEof(this);
+            _eofSent = true;
+        }
+
+        internal void WriteChannelOpenConfirmationData()
+        {
+        }
     }
 }

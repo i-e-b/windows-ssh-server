@@ -8,7 +8,13 @@ namespace SshDotNet
 {
     public abstract class SshChannel
     {
-        protected bool _eofSent; // True if EOF (end of file) message has been sent.
+        public event EventHandler<EventArgs> Opened;
+        public event EventHandler<EventArgs> EofSent;
+        public event EventHandler<EventArgs> EofReceived;
+        public event EventHandler<EventArgs> Closed;
+
+        protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
+        protected bool _eofReceived;                 // True if EOF (end of file) message has been received.
 
         protected SshConnectionService _connService; // Connection service.
         //protected uint _senderChannel;             // Channel number for sender.
@@ -28,6 +34,16 @@ namespace SshDotNet
             this.ServerChannel = serverChannel;
             this.WindowSize = windowSize;
             this.MaxPacketSize = maxPacketSize;
+        }
+
+        public bool IsEofSent
+        {
+            get { return _eofSent; }
+        }
+
+        public bool IsEofReceived
+        {
+            get { return _eofReceived; }
         }
 
         public uint ClientChannel
@@ -57,17 +73,67 @@ namespace SshDotNet
         public SshConnectionService ConnectionService
         {
             get { return _connService; }
-            internal set { _connService = value; }
         }
 
         public void SendEof()
         {
             _connService.SendMsgChannelEof(this);
             _eofSent = true;
+
+            // Raise event.
+            if (EofSent != null) EofSent(this, new EventArgs());
         }
 
-        internal void WriteChannelOpenConfirmationData()
+        public virtual void Close()
         {
+            _connService.SendMsgChannelClose(this);
+
+            // Raise event.
+            if (Closed != null) Closed(this, new EventArgs());
+        }
+
+        internal virtual void Open(SshConnectionService connService)
+        {
+            _connService = connService;
+
+            // Raise event.
+            if (Opened != null) Opened(this, new EventArgs());
+        }
+
+        internal virtual void ProcessEof()
+        {
+            _eofReceived = true;
+
+            // Raise event.
+            if (EofReceived != null) EofReceived(this, new EventArgs());
+        }
+
+        internal virtual void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgrReader)
+        {
+            switch (requestType)
+            {
+                case "pty-req":
+                    // Read information for pseudo-terminal request.
+                    var termNameEnvVar = msgrReader.ReadString();
+                    var termCharsWidth = msgrReader.ReadUInt32();
+                    var termCharsHeight = msgrReader.ReadUInt32();
+                    var termPixelsWidth = msgrReader.ReadUInt32();
+                    var termPixelsHeight = msgrReader.ReadUInt32();
+                    var termModes = msgrReader.ReadString();
+
+                    _connService.SendMsgChannelSuccess(this);
+
+                    break;
+                default:
+                    // Unrecognised request type.
+                    _connService.SendMsgChannelFailure(this);
+                    break;
+            }
+        }
+
+        internal virtual void WriteChannelOpenConfirmationData()
+        {
+            // To be overridden.
         }
     }
 }

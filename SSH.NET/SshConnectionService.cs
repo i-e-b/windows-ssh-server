@@ -139,6 +139,37 @@ namespace SshDotNet
             }
         }
 
+        internal void SendMsgRequestSuccess(byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                var msgWriter = new SshStreamWriter(msgStream);
+
+                msgWriter.Write((byte)SshConnectionMessage.RequestSuccess);
+                if (data != null) msgWriter.Write(data);
+
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
+        internal void SendMsgRequestFailure()
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                var msgWriter = new SshStreamWriter(msgStream);
+
+                msgWriter.Write((byte)SshConnectionMessage.RequestFailure);
+
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
         internal void SendMsgChannelOpenConfirmation(SshChannel channel)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -213,24 +244,6 @@ namespace SshDotNet
             }
         }
 
-        internal void SendMsgChannelRequest(SshChannel channel, string requestType, bool wantReply)
-        {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-            // Create message to send.
-            using (var msgStream = new MemoryStream())
-            {
-                var msgWriter = new SshStreamWriter(msgStream);
-
-                msgWriter.Write((byte)SshConnectionMessage.ChannelRequest);
-                msgWriter.Write(channel.ClientChannel);
-                msgWriter.Write(requestType);
-                msgWriter.Write(wantReply);
-
-                _client.SendPacket(msgStream.ToArray());
-            }
-        }
-
         internal void SendMsgChannelWindowAdjust(SshChannel channel, uint bytesToAdd)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -269,7 +282,7 @@ namespace SshDotNet
             }
         }
 
-        internal void SendMsgChannelExtendedData(SshChannel channel, SshExtendedDataType dataType, 
+        internal void SendMsgChannelExtendedData(SshChannel channel, SshExtendedDataType dataType,
             byte[] data)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -292,6 +305,59 @@ namespace SshDotNet
             }
         }
 
+        internal void SendMsgChannelRequest(SshChannel channel, string requestType, bool wantReply,
+            byte[] requestData)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                var msgWriter = new SshStreamWriter(msgStream);
+
+                msgWriter.Write((byte)SshConnectionMessage.ChannelRequest);
+                msgWriter.Write(channel.ClientChannel);
+                msgWriter.Write(requestType);
+                msgWriter.Write(wantReply);
+                msgWriter.Write(requestData);
+
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
+        internal void SendMsgChannelSuccess(SshChannel channel)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                var msgWriter = new SshStreamWriter(msgStream);
+
+                msgWriter.Write((byte)SshConnectionMessage.ChannelSuccess);
+                msgWriter.Write(channel.ClientChannel);
+
+
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
+        internal void SendMsgChannelFailure(SshChannel channel)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Create message to send.
+            using (var msgStream = new MemoryStream())
+            {
+                var msgWriter = new SshStreamWriter(msgStream);
+
+                msgWriter.Write((byte)SshConnectionMessage.ChannelFailure);
+                msgWriter.Write(channel.ClientChannel);
+
+                _client.SendPacket(msgStream.ToArray());
+            }
+        }
+
         protected void ProcessMsgGlobalRequest(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -300,7 +366,17 @@ namespace SshDotNet
             string requestName = msgReader.ReadString();
             bool wantReply = msgReader.ReadBoolean();
 
-            //
+            switch(requestName)
+            {
+                default:
+                    if (wantReply)
+                    {
+                        // Unrecognised request name.
+                        SendMsgRequestFailure();
+                    }
+
+                    break;
+            }
         }
 
         protected void ProcessMsgRequestSuccess(SshStreamReader msgReader)
@@ -339,14 +415,12 @@ namespace SshDotNet
 
                     var channel = channelRequestedEventArgs.Channel;
 
+                    // Check if channel was created.
                     if (channel != null)
                     {
-                        // Configure channel.
-                        channel.ConnectionService = this;
-
-                        // Add channel to list of open channels.
+                        channel.Open(this);
                         _channels.Add(channel);
-                        
+
                         // Send confirmation message.
                         SendMsgChannelOpenConfirmation(channel);
                     }
@@ -376,7 +450,7 @@ namespace SshDotNet
                         }
 
                         // Channel open request has failed.
-                        SendMsgChannelOpenFailure(channel,  channelRequestedEventArgs.FailureReason, 
+                        SendMsgChannelOpenFailure(channel, channelRequestedEventArgs.FailureReason,
                             failureDescription, "");
                         return;
                     }
@@ -406,24 +480,56 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //
+            // Read channel number and get channel object.
+            uint channelNum = msgReader.ReadUInt32();
+            SshChannel channel;
+
+            try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
+            catch (InvalidOperationException) { return; }
+
+            channel.ProcessEof();
         }
 
         protected void ProcessMsgChannelClose(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //
+            // Read channel number and get channel object.
+            uint channelNum = msgReader.ReadUInt32();
+            SshChannel channel;
 
-            // Raise event.
-            if (ChannelClosed != null) ChannelClosed(this, new EventArgs());
+            try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
+            catch (InvalidOperationException) { return; }
+
+            try
+            {
+                channel.Close();
+            }
+            finally
+            {
+                _channels.Remove(channel);
+
+                // Raise event.
+                if (ChannelClosed != null) ChannelClosed(this, new EventArgs());
+            }
         }
 
         protected void ProcessMsgChannelRequest(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //
+            // Read channel number and get channel object.
+            uint channelNum = msgReader.ReadUInt32();
+            SshChannel channel;
+
+            try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
+            catch (InvalidOperationException) { return; }
+
+            string requestType = msgReader.ReadString();
+            bool wantReply = msgReader.ReadBoolean();
+
+            // Let channel process request.
+            channel.ProcessRequest(requestType, wantReply, msgReader);
         }
     }
 

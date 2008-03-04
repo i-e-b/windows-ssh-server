@@ -18,6 +18,9 @@ namespace SshDotNet
         {
         }
 
-        //
+        internal override void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgrReader)
+        {
+            base.ProcessRequest(requestType, wantReply, msgrReader);
+        }
     }
 }

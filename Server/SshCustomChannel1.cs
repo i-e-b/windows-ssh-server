@@ -7,7 +7,7 @@ using SshDotNet;
 
 namespace WindowsSshServer
 {
-    public class SshCustomChannel1 : SshChannel
+    public class SshCustomChannel1 : SshSessionChannel
     {
         public SshCustomChannel1(ChannelOpenRequestEventArgs requestEventArgs)
             : base(requestEventArgs)

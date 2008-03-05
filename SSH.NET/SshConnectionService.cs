@@ -97,6 +97,12 @@ namespace SshDotNet
                     case SshConnectionMessage.ChannelRequest:
                         ProcessMsgChannelRequest(msgReader);
                         break;
+                    case SshConnectionMessage.ChannelData:
+                        ProcessMsgChannelData(msgReader);
+                        break;
+                    case SshConnectionMessage.ChannelExtendedData:
+                        ProcessMsgChannelExtendedData(msgReader);
+                        break;
                     // Unrecognised message
                     default:
                         return false;
@@ -530,6 +536,20 @@ namespace SshDotNet
 
             // Let channel process request.
             channel.ProcessRequest(requestType, wantReply, msgReader);
+        }
+
+        protected void ProcessMsgChannelData(SshStreamReader msgReader)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            //
+        }
+
+        protected void ProcessMsgChannelExtendedData(SshStreamReader msgReader)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            //
         }
     }
 

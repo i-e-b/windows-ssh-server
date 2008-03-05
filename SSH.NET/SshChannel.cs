@@ -13,6 +13,8 @@ namespace SshDotNet
         public event EventHandler<EventArgs> EofReceived;
         public event EventHandler<EventArgs> Closed;
 
+        protected List<TerminalMode> _termModes;     // List of active terminal modes.
+
         protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
         protected bool _eofReceived;                 // True if EOF (end of file) message has been received.
 
@@ -108,20 +110,15 @@ namespace SshDotNet
             if (EofReceived != null) EofReceived(this, new EventArgs());
         }
 
-        internal virtual void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgrReader)
+        internal virtual void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgReader)
         {
             switch (requestType)
             {
-                case "pty-req":
-                    // Read information for pseudo-terminal request.
-                    var termNameEnvVar = msgrReader.ReadString();
-                    var termCharsWidth = msgrReader.ReadUInt32();
-                    var termCharsHeight = msgrReader.ReadUInt32();
-                    var termPixelsWidth = msgrReader.ReadUInt32();
-                    var termPixelsHeight = msgrReader.ReadUInt32();
-                    var termModes = msgrReader.ReadString();
+                case "signal":
+                    // Process signal.
+                    var signalName = msgReader.ReadString();
 
-                    _connService.SendMsgChannelSuccess(this);
+                    ProcessSignal(signalName);
 
                     break;
                 default:
@@ -131,9 +128,91 @@ namespace SshDotNet
             }
         }
 
+        internal virtual void ProcessSignal(string signalName)
+        {
+            // empty
+        }
+
         internal virtual void WriteChannelOpenConfirmationData()
         {
-            // To be overridden.
+            // empty
         }
+    }
+
+    public struct TerminalMode
+    {
+        public TerminalModeOpCode OpCode;
+        public uint Argument;
+
+        public TerminalMode(TerminalModeOpCode opCode, uint argument)
+        {
+            this.OpCode = opCode;
+            this.Argument = argument;
+        }
+    }
+
+    public enum TerminalModeOpCode : byte
+    {
+        TtyOpEnd = 0,
+
+        VIntr = 1,
+        VQuit,
+        VErase,
+        VKill,
+        VEof,
+        VEol,
+        VEol2,
+        VStart,
+        VStop,
+        VSusp,
+        VDSusp,
+        VReprint,
+        VWErase,
+        VLNext,
+        VFlush,
+        VSwitch,
+        VStatus,
+        VDiscard,
+
+        IgnPar = 30,
+        ParMrk,
+        InPCk,
+        IStrip,
+        INLCR,
+        IgnCR,
+        ICRNL,
+        IUCLC,
+        IXOn,
+        IXAny,
+        IXOff,
+        IMaxBel,
+
+        ISig = 50,
+        ICanon,
+        XCase,
+        Echo,
+        EchoE,
+        EchoK,
+        EchoNL,
+        NoFlsh,
+        TOStop,
+        IExten,
+        EchoCtl,
+        EchoKE,
+        PendIn,
+
+        OPost = 70,
+        OLCUC,
+        ONLCR,
+        OCRNL,
+        ONLRet,
+
+        CS7 = 90,
+        CS8,
+        ParEnb,
+        ParOdd,
+
+        TtyOpISpeed = 128,
+        TtyOpOSpeed
     }
 }

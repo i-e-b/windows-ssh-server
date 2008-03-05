@@ -18,9 +18,32 @@ namespace SshDotNet
         {
         }
 
-        internal override void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgrReader)
+        internal override void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgReader)
         {
-            base.ProcessRequest(requestType, wantReply, msgrReader);
+            switch (requestType)
+            {
+                case "pty-req":
+                    // Read information for pseudo-terminal request.
+                    var termNameEnvVar = msgReader.ReadString();
+                    var termCharsWidth = msgReader.ReadUInt32();
+                    var termCharsHeight = msgReader.ReadUInt32();
+                    var termPixelsWidth = msgReader.ReadUInt32();
+                    var termPixelsHeight = msgReader.ReadUInt32();
+                    var termModes = msgReader.ReadString();
+
+                    //
+
+                    if (wantReply) _connService.SendMsgChannelSuccess(this);
+
+                    break;
+                case "shell":
+                    if (wantReply) _connService.SendMsgChannelSuccess(this);
+
+                    break;
+                default:
+                    base.ProcessRequest(requestType, wantReply, msgReader);
+                    break;
+            }
         }
     }
 }

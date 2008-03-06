@@ -5,6 +5,8 @@ using System.Text;
 
 using SshDotNet;
 
+using ConsoleDotNet;
+
 namespace WindowsSshServer
 {
     public class SshCustomChannel1 : SshSessionChannel

@@ -108,9 +108,6 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="ConsoleHook.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="EventLogMsgs.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -119,6 +116,10 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Console.NET\Console.NET.csproj">
+      <Project>{BD960392-CED7-4506-B550-6134D53F4F65}</Project>
+      <Name>Console.NET</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SSH.NET\SSH.NET.csproj">
       <Project>{B391E414-FEBF-4A0C-970B-5A4596ED597A}</Project>
       <Name>SSH.NET</Name>

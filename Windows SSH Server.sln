@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSH.NET", "SSH.NET\SSH.NET.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server Manager", "Server Manager\Server Manager.csproj", "{D73F90E0-2AC5-415D-B7A0-AD02EE53FDAD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console.NET", "Console.NET\Console.NET.csproj", "{BD960392-CED7-4506-B550-6134D53F4F65}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{D73F90E0-2AC5-415D-B7A0-AD02EE53FDAD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D73F90E0-2AC5-415D-B7A0-AD02EE53FDAD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D73F90E0-2AC5-415D-B7A0-AD02EE53FDAD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BD960392-CED7-4506-B550-6134D53F4F65}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BD960392-CED7-4506-B550-6134D53F4F65}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BD960392-CED7-4506-B550-6134D53F4F65}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BD960392-CED7-4506-B550-6134D53F4F65}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

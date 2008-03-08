@@ -71,8 +71,8 @@
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
       <SubType>Designer</SubType>
     </EmbeddedResource>
-    <EmbeddedResource Include="SshService.resx">
-      <DependentUpon>SshService.cs</DependentUpon>
+    <EmbeddedResource Include="ServerService.resx">
+      <DependentUpon>ServerService.cs</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <Compile Include="Properties\Resources.Designer.cs">
@@ -95,15 +95,15 @@
     </Compile>
     <Compile Include="SshConsoleClient.cs" />
     <Compile Include="Extensions.cs" />
-    <Compile Include="SshService.Designer.cs">
-      <DependentUpon>SshService.cs</DependentUpon>
+    <Compile Include="ServerService.Designer.cs">
+      <DependentUpon>ServerService.cs</DependentUpon>
     </Compile>
-    <Compile Include="SshServiceInstaller.cs">
+    <Compile Include="ServerServiceInstaller.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="SshCustomChannel1.cs" />
+    <Compile Include="SshTerminalChannel.cs" />
     <Compile Include="SshTcpServer.cs" />
-    <Compile Include="SshService.cs">
+    <Compile Include="ServerService.cs">
       <SubType>Component</SubType>
     </Compile>
   </ItemGroup>

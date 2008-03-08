@@ -97,6 +97,9 @@ namespace SshDotNet
                     case SshConnectionMessage.ChannelRequest:
                         ProcessMsgChannelRequest(msgReader);
                         break;
+                    case SshConnectionMessage.ChannelWindowAdjust:
+                        ProcessMsgChannelWindowAdjust(msgReader);
+                        break;
                     case SshConnectionMessage.ChannelData:
                         ProcessMsgChannelData(msgReader);
                         break;
@@ -120,11 +123,14 @@ namespace SshDotNet
             base.Start();
         }
 
-        internal override void Stop()
+        protected override void InternalStop()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            base.Stop();
+            // Dispose each channel.
+            foreach (var channel in _channels) channel.Dispose();
+
+            base.InternalStop();
         }
 
         internal void SendMsgGlobalRequest(string requestName, bool wantReply, byte[] data)
@@ -372,7 +378,7 @@ namespace SshDotNet
             string requestName = msgReader.ReadString();
             bool wantReply = msgReader.ReadBoolean();
 
-            switch(requestName)
+            switch (requestName)
             {
                 default:
                     if (wantReply)
@@ -538,18 +544,56 @@ namespace SshDotNet
             channel.ProcessRequest(requestType, wantReply, msgReader);
         }
 
+        protected void ProcessMsgChannelWindowAdjust(SshStreamReader msgReader)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Read channel number and get channel object.
+            uint channelNum = msgReader.ReadUInt32();
+            SshChannel channel;
+
+            try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
+            catch (InvalidOperationException) { return; }
+
+            // Let channel adjust window size.
+            var bytesToAdd = msgReader.ReadUInt32();
+
+            channel.ProcessWindowAdjust(bytesToAdd);
+        }
+
         protected void ProcessMsgChannelData(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //
+            // Read channel number and get channel object.
+            uint channelNum = msgReader.ReadUInt32();
+            SshChannel channel;
+
+            try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
+            catch (InvalidOperationException) { return; }
+
+            // Let channel read data.
+            var data = msgReader.ReadByteString();
+
+            channel.ProcessData(data);
         }
 
         protected void ProcessMsgChannelExtendedData(SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //
+            // Read channel number and get channel object.
+            uint channelNum = msgReader.ReadUInt32();
+            SshChannel channel;
+
+            try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
+            catch (InvalidOperationException) { return; }
+
+            // Let channel read extended data.
+            var dataType = (SshExtendedDataType)msgReader.ReadUInt32();
+            var data = msgReader.ReadByteString();
+
+            channel.ProcessExtendedData(dataType, data);
         }
     }
 

@@ -15,13 +15,19 @@ using SshDotNet.Algorithms;
 
 namespace WindowsSshServer
 {
-    public partial class SshService : ServiceBase
+    public partial class ServerService : ServiceBase
     {
         //protected delegate void LogClientEventDelegate(SshClient client);
 
-        protected const string _eventLogName = "Windows-Ssh-Server";
-        protected const string _eventSourceName = "Windows-Ssh-Server";
-        protected const string _keysDir = @"../../../Keys/"; // Directory from which to load host keys.
+        internal const string EventLogName = "Windows-Ssh-Server";
+        internal const string EventSourceName = "Windows-Ssh-Server";
+        internal const string KeysDirectory = @"../../../Keys/"; // Directory from which to load host keys.
+
+        static ServerService()
+        {
+            SshTerminalChannel.InjectionDllFileName = Path.Combine(ServerService.GetStartupPath(),
+                "ConsoleHook.dll");
+        }
 
         public static new string ServiceName
         {
@@ -34,37 +40,19 @@ namespace WindowsSshServer
                 .GetCustomAttributes(typeof(AssemblyProductAttribute), false))[0]).Product;
         }
 
+        public static string GetStartupPath()
+        {
+            return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+        }
+
         protected SshTcpServer _tcpServer; // TCP server for SSH connections.
 
-        public SshService()
+        public ServerService()
             : base()
         {
-            // Get path of message resource file.
-            var startupPath = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
-            var messageFile = Path.Combine(startupPath, "EventLogMsgs.dll");
-
-            // Check if event log source does not yet exist.
-            if (!EventLog.SourceExists(_eventSourceName))
-            {
-                // Create event log.
-                var sourceData = new EventSourceCreationData(_eventSourceName, _eventLogName);
-
-                //sourceData.MessageResourceFile = messageFile;
-                //sourceData.CategoryResourceFile = messageFile;
-                //sourceData.CategoryCount = 0;
-                //sourceData.ParameterResourceFile = messageFile;
-
-                EventLog.CreateEventSource(sourceData);
-
-                // Register display name for event log.
-                this.EventLog.Source = _eventSourceName;
-                this.EventLog.Log = _eventLogName;
-                this.EventLog.RegisterDisplayName(messageFile, 5001);
-            }
-
             // Configure event log.
-            this.EventLog.Source = _eventSourceName;
-            this.EventLog.Log = _eventLogName;
+            this.EventLog.Source = EventSourceName;
+            this.EventLog.Log = EventLogName;
 
             // Create TCP server.
             _tcpServer = new SshTcpServer();
@@ -102,17 +90,17 @@ namespace WindowsSshServer
                     break;
                 case AuthenticationResult.Failure:
                     LogClientEvent(client, string.Format("User '{0}' has failed to authenticate using the" +
-                        "{1} method.", authUserEventArgs.UserName, method.GetName()), 
+                        "{1} method.", authUserEventArgs.UserName, method.GetName()),
                         EventLogEntryType.Information);
                     break;
                 case AuthenticationResult.PasswordExpired:
-                    LogClientEvent(client, string.Format("User '{0}' has attempted to authenticate " + 
-                        "using an expired password.", authUserEventArgs.UserName), 
+                    LogClientEvent(client, string.Format("User '{0}' has attempted to authenticate " +
+                        "using an expired password.", authUserEventArgs.UserName),
                         EventLogEntryType.Information);
                     break;
                 case AuthenticationResult.RequestMoreInfo:
                     LogClientEvent(client, string.Format("User '{0}' has correctly responded to prompts " +
-                        "but the server requested more information.", authUserEventArgs.UserName), 
+                        "but the server requested more information.", authUserEventArgs.UserName),
                         EventLogEntryType.Information);
                     break;
             }
@@ -283,10 +271,11 @@ namespace WindowsSshServer
 
         private void connService_ChannelOpenRequest(object sender, ChannelOpenRequestEventArgs e)
         {
-            var channel = new SshCustomChannel1(e);
+            var channel = new SshTerminalChannel(e);
+
+            channel.Initialize();
 
             e.Channel = channel;
-
             // e.FailureReason = SshChannelOpenFailureReason.UnknownChannelType;
         }
 
@@ -307,13 +296,13 @@ namespace WindowsSshServer
             // Load host key for chosen algorithm.
             if (e.HostKeyAlgorithm is SshDss)
             {
-                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
+                using (var fileStream = new FileStream(Path.Combine(KeysDirectory, @"dss-default.key"),
                     FileMode.Open, FileAccess.Read))
                     e.HostKeyAlgorithm.ImportKey(fileStream);
             }
             else if (e.HostKeyAlgorithm is SshRsa)
             {
-                using (var fileStream = new FileStream(Path.Combine(_keysDir, @"rsa-default.key"),
+                using (var fileStream = new FileStream(Path.Combine(KeysDirectory, @"rsa-default.key"),
                     FileMode.Open, FileAccess.Read))
                     e.HostKeyAlgorithm.ImportKey(fileStream);
             }

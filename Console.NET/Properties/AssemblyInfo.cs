@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("Console.NET")]
-[assembly: AssemblyDescription("Library for controlling multiple Windows consoles.")]
+[assembly: AssemblyDescription("Library for interfacing with multiple Windows consoles.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("Console.NET")]

@@ -6,21 +6,20 @@ using System.Text;
 
 namespace SshDotNet
 {
-    public abstract class SshChannel
+    public abstract class SshChannel : IDisposable
     {
         public event EventHandler<EventArgs> Opened;
         public event EventHandler<EventArgs> EofSent;
         public event EventHandler<EventArgs> EofReceived;
         public event EventHandler<EventArgs> Closed;
-
-        protected List<TerminalMode> _termModes;     // List of active terminal modes.
+        public event EventHandler<EventArgs> DataReceived;
 
         protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
         protected bool _eofReceived;                 // True if EOF (end of file) message has been received.
 
         protected SshConnectionService _connService; // Connection service.
-        //protected uint _senderChannel;             // Channel number for sender.
-        //protected uint _recipientChannel;          // Channel number for recipient.
+        
+        private bool _isDisposed = false;            // True if object has been disposed.
 
         public SshChannel(ChannelOpenRequestEventArgs requestEventArgs)
             : this(requestEventArgs.ClientChannel, requestEventArgs.ServerChannel,
@@ -36,6 +35,33 @@ namespace SshDotNet
             this.ServerChannel = serverChannel;
             this.WindowSize = windowSize;
             this.MaxPacketSize = maxPacketSize;
+        }
+
+        ~SshChannel()
+        {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_isDisposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources.
+                    InternalClose();
+                }
+
+                // Dispose unmanaged resources.
+            }
+
+            _isDisposed = true;
         }
 
         public bool IsEofSent
@@ -79,39 +105,55 @@ namespace SshDotNet
 
         public void SendEof()
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             _connService.SendMsgChannelEof(this);
             _eofSent = true;
 
             // Raise event.
-            if (EofSent != null) EofSent(this, new EventArgs());
+            OnEofSent(new EventArgs());
         }
 
-        public virtual void Close()
+        public void Close()
         {
-            _connService.SendMsgChannelClose(this);
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            InternalClose();   
+        }
+
+        protected virtual void InternalClose()
+        {
+            // Send close message if client is connected.
+            if (_connService.Client.IsConnected) _connService.SendMsgChannelClose(this);
 
             // Raise event.
-            if (Closed != null) Closed(this, new EventArgs());
+            OnClosed(new EventArgs());
         }
 
         internal virtual void Open(SshConnectionService connService)
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             _connService = connService;
 
             // Raise event.
-            if (Opened != null) Opened(this, new EventArgs());
+            OnOpened(new EventArgs());
         }
 
         internal virtual void ProcessEof()
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             _eofReceived = true;
 
             // Raise event.
-            if (EofReceived != null) EofReceived(this, new EventArgs());
+            OnEofReceived(new EventArgs());
         }
 
         internal virtual void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgReader)
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             switch (requestType)
             {
                 case "signal":
@@ -128,6 +170,31 @@ namespace SshDotNet
             }
         }
 
+        internal void ProcessWindowAdjust(uint bytesToRead)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            //
+        }
+
+        internal void ProcessData(byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            //
+
+            // Raise event.
+            OnDataReceived(new EventArgs());
+        }
+
+        internal void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Raise event.
+            OnDataReceived(new EventArgs());
+        }
+
         internal virtual void ProcessSignal(string signalName)
         {
             // empty
@@ -136,6 +203,41 @@ namespace SshDotNet
         internal virtual void WriteChannelOpenConfirmationData()
         {
             // empty
+        }
+
+        protected virtual void OnOpened(EventArgs e)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            if (Opened != null) Opened(this, e);
+        }
+
+        protected virtual void OnEofSent(EventArgs e)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            if (EofSent != null) EofSent(this, e);
+        }
+
+        protected virtual void OnEofReceived(EventArgs e)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            if (EofReceived != null) EofReceived(this, e);
+        }
+        
+        protected virtual void OnClosed(EventArgs e)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            if (Closed != null) Closed(this, e);
+        }
+
+        protected virtual void OnDataReceived(EventArgs e)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            if (DataReceived != null) DataReceived(this, e);
         }
     }
 

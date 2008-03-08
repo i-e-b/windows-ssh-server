@@ -20,7 +20,7 @@ namespace WindowsSshServer
     {
         protected const string _keysDir = @"../../../Keys/"; // Directory from which to load host keys.
 
-        protected SshService _service; // Service object for server.
+        protected ServerService _service; // Service object for server.
 
         public MainForm()
         {
@@ -29,7 +29,7 @@ namespace WindowsSshServer
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            _service = new SshService();
+            _service = new ServerService();
 
             // Start server immediately.
             startButton.PerformClick();

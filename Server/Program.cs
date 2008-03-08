@@ -17,7 +17,7 @@ namespace WindowsSshServer
             if (Environment.UserName == "SYSTEM")
             {
                 // Run service.
-                using (var service = new SshService())
+                using (var service = new ServerService())
                 {
                     System.ServiceProcess.ServiceBase.Run(service);
                 }

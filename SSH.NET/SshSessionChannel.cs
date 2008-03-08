@@ -7,6 +7,9 @@ namespace SshDotNet
 {
     public class SshSessionChannel : SshChannel
     {
+        protected string _termEnvVar;            // TERM environment variable.
+        protected List<TerminalMode> _termModes; // List of active terminal modes.
+
         public SshSessionChannel(ChannelOpenRequestEventArgs requestEventArgs)
             : base(requestEventArgs)
         {
@@ -24,7 +27,7 @@ namespace SshDotNet
             {
                 case "pty-req":
                     // Read information for pseudo-terminal request.
-                    var termNameEnvVar = msgReader.ReadString();
+                    var termEnvVar = msgReader.ReadString();
                     var termCharsWidth = msgReader.ReadUInt32();
                     var termCharsHeight = msgReader.ReadUInt32();
                     var termPixelsWidth = msgReader.ReadUInt32();
@@ -32,6 +35,8 @@ namespace SshDotNet
                     var termModes = msgReader.ReadString();
 
                     //
+
+                    _termEnvVar = termEnvVar;
 
                     if (wantReply) _connService.SendMsgChannelSuccess(this);
 

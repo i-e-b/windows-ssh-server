@@ -81,11 +81,17 @@ namespace ConsoleDotNet
                 // Close console window.
                 unsafe
                 {
-                    ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
+                    try
+                    {
+                        ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
 
-                    if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
-                        WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
-                            IntPtr.Zero, IntPtr.Zero);
+                        if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
+                            WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
+                                IntPtr.Zero, IntPtr.Zero);
+                    }
+                    catch (AccessViolationException)
+                    {
+                    }
                 }
 
                 // Dispose shared memory objects.

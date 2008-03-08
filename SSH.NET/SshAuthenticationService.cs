@@ -130,9 +130,9 @@ namespace SshDotNet
             base.Start();
         }
 
-        internal override void Stop()
+        protected override void InternalStop()
         {
-            base.Stop();
+            base.InternalStop();
         }
 
         internal override bool ProcessMessage(byte[] payload)

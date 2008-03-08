@@ -386,6 +386,9 @@ namespace SshDotNet
             // Check if connection is already closed.
             if (_stream == null) return;
 
+            // Stop each service.
+            foreach (var service in _services) service.Stop();
+
             // Dispose objects for data transmission.
             if (_stream != null)
             {

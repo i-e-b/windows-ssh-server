@@ -37,6 +37,7 @@ namespace SshDotNet
                 if (disposing)
                 {
                     // Dispose managed resources.
+                    InternalStop();
                 }
 
                 // Dispose unmanaged resources.
@@ -59,11 +60,20 @@ namespace SshDotNet
 
         internal virtual void Start()
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             // Raise event.
             if (Started != null) Started(this, new EventArgs());
         }
 
-        internal virtual void Stop()
+        internal void Stop()
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            InternalStop();
+        }
+
+        protected virtual void InternalStop()
         {
             // Raise event.
             if (Stopped != null) Stopped(this, new EventArgs());

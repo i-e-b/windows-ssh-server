@@ -1,6 +1,6 @@
 ﻿namespace WindowsSshServer
 {
-    public partial class SshService : System.ServiceProcess.ServiceBase
+    public partial class ServerService : System.ServiceProcess.ServiceBase
     {
         /// <summary> 
         /// Required designer variable.

@@ -121,16 +121,7 @@ namespace SshDotNet
             InternalClose();   
         }
 
-        protected virtual void InternalClose()
-        {
-            // Send close message if client is connected.
-            if (_connService.Client.IsConnected) _connService.SendMsgChannelClose(this);
-
-            // Raise event.
-            OnClosed(new EventArgs());
-        }
-
-        internal virtual void Open(SshConnectionService connService)
+        protected internal virtual void Open(SshConnectionService connService)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -140,7 +131,16 @@ namespace SshDotNet
             OnOpened(new EventArgs());
         }
 
-        internal virtual void ProcessEof()
+        protected virtual void InternalClose()
+        {
+            // Send close message if client is connected.
+            if (_connService.Client.IsConnected) _connService.SendMsgChannelClose(this);
+
+            // Raise event.
+            OnClosed(new EventArgs());
+        }
+
+        protected internal virtual void ProcessEof()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -150,7 +150,7 @@ namespace SshDotNet
             OnEofReceived(new EventArgs());
         }
 
-        internal virtual void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgReader)
+        protected internal virtual void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgReader)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -170,24 +170,14 @@ namespace SshDotNet
             }
         }
 
-        internal void ProcessWindowAdjust(uint bytesToRead)
+        protected internal virtual void ProcessWindowAdjust(uint bytesToRead)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             //
         }
 
-        internal void ProcessData(byte[] data)
-        {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-            //
-
-            // Raise event.
-            OnDataReceived(new EventArgs());
-        }
-
-        internal void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
+        protected internal virtual void ProcessData(byte[] data)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -195,12 +185,20 @@ namespace SshDotNet
             OnDataReceived(new EventArgs());
         }
 
-        internal virtual void ProcessSignal(string signalName)
+        protected internal virtual void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Raise event.
+            OnDataReceived(new EventArgs());
+        }
+
+        protected internal virtual void ProcessSignal(string signalName)
         {
             // empty
         }
 
-        internal virtual void WriteChannelOpenConfirmationData()
+        protected internal virtual void WriteChannelOpenConfirmationData()
         {
             // empty
         }

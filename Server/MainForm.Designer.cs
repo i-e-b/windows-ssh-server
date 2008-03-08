@@ -100,10 +100,11 @@
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(464, 124);
             this.Controls.Add(this.generateKeysButton);
-            this.Controls.Add(this.clientCountLabel);
-            this.Controls.Add(this.statusLabel);
             this.Controls.Add(this.stopButton);
             this.Controls.Add(this.startButton);
+            this.Controls.Add(this.clientCountLabel);
+            this.Controls.Add(this.statusLabel);
+            this.Location = new System.Drawing.Point(-1, -1);
             this.Name = "MainForm";
             this.Text = "Windows SSH Server";
             this.Load += new System.EventHandler(this.MainForm_Load);

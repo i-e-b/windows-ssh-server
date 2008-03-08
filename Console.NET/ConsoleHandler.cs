@@ -192,6 +192,8 @@ namespace ConsoleDotNet
 
         public void Initialize()
         {
+            int retValue;
+
             // Start new console process.
             StartProcess();
 
@@ -203,10 +205,10 @@ namespace ConsoleDotNet
             WinApi.CloseHandle(_procInfo.hThread);
 
             // Wait for DLL to set console handle.
-            int waitRet = WinApi.WaitForSingleObject(_consoleParams.RequestEvent.SafeWaitHandle
+            retValue = WinApi.WaitForSingleObject(_consoleParams.RequestEvent.SafeWaitHandle
                 .DangerousGetHandle(), 1000);
-            if (waitRet == WinApi.WAIT_FAILED) throw new Win32Exception();
-            if (waitRet == WinApi.WAIT_TIMEOUT) throw new TimeoutException();
+            if (retValue == WinApi.WAIT_FAILED) throw new Win32Exception();
+            if (retValue == WinApi.WAIT_TIMEOUT) throw new TimeoutException();
 
             // Create wait handle for console process.
             _procSafeWaitHandle = new SafeWaitHandle(_process.Handle, false);
@@ -394,7 +396,7 @@ namespace ConsoleDotNet
 
             // Start new console process.
             _process = Process.GetProcessById(_procInfo.dwProcessId);
-
+            
             // Create objects in shared memory.
             CreateSharedObjects(_procInfo.dwProcessId);
 

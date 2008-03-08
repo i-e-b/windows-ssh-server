@@ -28,6 +28,9 @@ namespace WindowsSshServer
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new MainForm());
+
+                // Save user settings.
+                Properties.Settings.Default.Save();
             }
         }
     }

@@ -125,8 +125,6 @@ namespace SshDotNet
 
         protected override void InternalStop()
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             // Dispose each channel.
             foreach (var channel in _channels) channel.Dispose();
 

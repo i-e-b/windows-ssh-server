@@ -29,6 +29,11 @@ namespace WindowsSshServer
 
         private void MainForm_Load(object sender, EventArgs e)
         {
+            // Position form within screen.
+            if (Properties.Settings.Default.MainFormLocation != new Point(-1, -1))
+                this.Location = Properties.Settings.Default.MainFormLocation;
+
+            // Create service for server.
             _service = new ServerService();
 
             // Start server immediately.
@@ -37,6 +42,9 @@ namespace WindowsSshServer
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
         {
+            Properties.Settings.Default.MainFormLocation = this.Location;
+
+            // Dispose service.
             _service.Dispose();
         }
 

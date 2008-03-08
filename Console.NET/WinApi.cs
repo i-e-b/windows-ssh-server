@@ -6,7 +6,7 @@ using System.Text;
 
 namespace ConsoleDotNet
 {
-    internal static class WinApi
+    public static class WinApi
     {
         public const int INFINITE = 0XFFFFFF;
 

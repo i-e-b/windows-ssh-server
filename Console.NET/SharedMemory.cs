@@ -68,40 +68,71 @@ namespace ConsoleDotNet
 
         public EventWaitHandle RequestEvent
         {
-            get { return _sharedReqEvent; }
+            get
+            {
+                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+                return _sharedReqEvent;
+            }
         }
 
         public EventWaitHandle ResponseEvent
         {
-            get { return _sharedRespEvent; }
+            get
+            {
+                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+                return _sharedRespEvent;
+            }
+        }
+
+        public bool IsDisposed
+        {
+            get { return _isDisposed; }
         }
 
         public unsafe void* Get(int index)
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             return (void*)(_pSharedMemory.ToInt32() + index * Marshal.SizeOf(typeof(T)));
         }
 
         public unsafe void* Get()
         {
-            return (void*) _pSharedMemory;
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            return (void*)_pSharedMemory;
+        }
+
+        public unsafe void Set(void* data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            void** pMemory = (void**)_pSharedMemory;
+            *pMemory = data;
         }
 
         public void Lock()
         {
-            if (_sharedMutex == null) return;
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            if (_sharedMutex == null) return;
             _sharedMutex.WaitOne();
         }
 
         public void Release()
         {
-            if (_sharedMutex == null) return;
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            if (_sharedMutex == null) return;
             _sharedMutex.ReleaseMutex();
         }
 
         public void Create(string name, int size, SyncObjectTypes syncObjects)
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             _name = name;
             _size = size;
 
@@ -119,13 +150,15 @@ namespace ConsoleDotNet
 
             // Zero file-mapped memory.
             WinApi.ZeroMemory(_pSharedMemory, _size * Marshal.SizeOf(typeof(T)));
-            
+
             // Create synchronisation objects.
             if (syncObjects != SyncObjectTypes.SyncObjNone) CreateSyncObjects(syncObjects, name);
         }
 
         public void Open(string name, SyncObjectTypes syncObjects)
         {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
             _name = name;
 
             // Open file mapping.
@@ -150,7 +183,7 @@ namespace ConsoleDotNet
             if (syncObjects >= SyncObjectTypes.SyncObjRequest)
             {
                 _sharedMutex = new Mutex(false, name + "_mutex");
-                _sharedReqEvent = new EventWaitHandle(false, EventResetMode.AutoReset, 
+                _sharedReqEvent = new EventWaitHandle(false, EventResetMode.AutoReset,
                     name + "_req_event");
             }
 
@@ -159,6 +192,23 @@ namespace ConsoleDotNet
                 _sharedRespEvent = new EventWaitHandle(false, EventResetMode.AutoReset,
                     name + "_resp_event");
             }
+        }
+    }
+
+    public class SharedMemoryLock<T> : IDisposable where T : new()
+    {
+        protected SharedMemory<T> _sharedMemory;
+
+        public SharedMemoryLock(SharedMemory<T> sharedMemory)
+        {
+            // Get lock on memory.
+            _sharedMemory.Lock();
+        }
+
+        public void Dispose()
+        {
+            // Release lock on memory.
+            _sharedMemory.Release();
         }
     }
 

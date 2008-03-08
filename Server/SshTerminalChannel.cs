@@ -42,7 +42,7 @@ namespace WindowsSshServer
                     {
                         // Dispose managed resources.
                     }
-                    
+
                     // Dispose unmanaged resources.
                 }
 
@@ -70,6 +70,59 @@ namespace WindowsSshServer
             if (_consoleHandler != null) _consoleHandler.Dispose();
 
             base.InternalClose();
+        }
+
+        protected override void ProcessData(byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            // Paste received data to console.
+            var pasteInfo = _consoleHandler.ConsolePasteInfo;
+
+            unsafe
+            {
+                try
+                {
+                    pasteInfo.Lock();
+
+                    // Allocate memory for pasting data.
+                    IntPtr pRemoteMemory = WinApi.VirtualAllocEx(_consoleHandler.ProcessHandle, IntPtr.Zero,
+                        data.Length, WinApi.MEM_COMMIT, WinApi.PAGE_READWRITE);
+
+                    if (pRemoteMemory == IntPtr.Zero) return;
+
+                    int numBytesWritten;
+
+                    if (!WinApi.WriteProcessMemory(_consoleHandler.ProcessHandle, pRemoteMemory, data,
+                        data.Length, out numBytesWritten))
+                    {
+                        // Free allocated memory.
+                        WinApi.VirtualFreeEx(_consoleHandler.ProcessHandle, pRemoteMemory, 0, 
+                            WinApi.MEM_RELEASE);
+                        return;
+                    }
+
+                    // Set address of data to paste.
+                    pasteInfo.Set((void*)pRemoteMemory);
+                }
+                finally
+                {
+                    if (!pasteInfo.IsDisposed) pasteInfo.Release();
+                }
+
+                // Signal request and wait for response.
+                pasteInfo.RequestEvent.Set();
+                pasteInfo.ResponseEvent.WaitOne();
+            }
+
+            if (_isDisposed) base.ProcessData(data);
+        }
+
+        protected override void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            base.ProcessExtendedData(dataType, data);
         }
     }
 }

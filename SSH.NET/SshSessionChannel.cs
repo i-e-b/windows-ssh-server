@@ -21,7 +21,8 @@ namespace SshDotNet
         {
         }
 
-        internal override void ProcessRequest(string requestType, bool wantReply, SshStreamReader msgReader)
+        protected internal override void ProcessRequest(string requestType, bool wantReply, 
+            SshStreamReader msgReader)
         {
             switch (requestType)
             {

@@ -17,7 +17,7 @@ namespace WindowsSshServer
 {
     public partial class ServerService : ServiceBase
     {
-        //protected delegate void LogClientEventDelegate(SshClient client);
+        //protected delegate void LogClientEventHandler(SshClient client);
 
         internal const string EventLogName = "Windows-Ssh-Server";
         internal const string EventSourceName = "Windows-Ssh-Server";
@@ -42,7 +42,8 @@ namespace WindowsSshServer
 
         public static string GetStartupPath()
         {
-            return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+            //return Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+            return Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         }
 
         protected SshTcpServer _tcpServer; // TCP server for SSH connections.

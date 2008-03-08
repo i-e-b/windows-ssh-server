@@ -14,13 +14,9 @@ namespace WindowsSshServer
     [RunInstaller(true)]
     public class ServerServiceInstaller : Installer
     {
-        protected string _eventLogMessagesFileName; // File name of messages DLL for event log.
-
         public ServerServiceInstaller()
             : base()
         {
-            _eventLogMessagesFileName = Path.Combine(ServerService.GetStartupPath(), "EventLogMsgs.dll");
-
             // Add service installer.
             var serviceInstaller = new ServiceInstaller();
 
@@ -43,7 +39,7 @@ namespace WindowsSshServer
 
             // Add event log installer.
             var eventLogInstaller = new EventLogInstaller();
-            
+
             //// Check if event log source does not yet exist.
             //if (!EventLog.SourceExists(SshService.EventSourceName))
 
@@ -63,15 +59,19 @@ namespace WindowsSshServer
         {
             base.OnBeforeInstall(savedState);
         }
-
+        
         protected override void OnAfterInstall(System.Collections.IDictionary savedState)
         {
             // Register display name for event log.
-            using (var eventLog = new EventLog(ServerService.EventLogName, ".", ServerService.EventSourceName))
+            using (var eventLog = new EventLog(ServerService.EventLogName, ".",
+                ServerService.EventSourceName))
             {
-                eventLog.RegisterDisplayName(_eventLogMessagesFileName, 5001);
+                var messagesFileName = Path.Combine(Path.GetDirectoryName(this.Context.Parameters
+                    ["assemblypath"]), "EventLogMsgs.dll");
+
+                eventLog.RegisterDisplayName(messagesFileName, 5001);
             }
-            
+
             base.OnAfterInstall(savedState);
         }
 

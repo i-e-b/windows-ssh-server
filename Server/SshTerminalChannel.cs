@@ -54,14 +54,49 @@ namespace WindowsSshServer
             }
         }
 
-        public void Initialize()
+        public bool TerminalVisible
+        {
+            get
+            {
+                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+                return _consoleHandler.ConsoleVisible;
+            }
+            set
+            {
+                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+                _consoleHandler.ConsoleVisible = value;
+            }
+        }
+
+        protected override void StartShell()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            // Create console handler.
-            _consoleHandler = new ConsoleHandler();
-            _consoleHandler.InjectionDllFileName = SshTerminalChannel.InjectionDllFileName;
+            _consoleHandler.EnvironmentVars = _envVars;
+            _consoleHandler.ConsoleInitialWindowWidth = (int)_termCharsWidth;
+            _consoleHandler.ConsoleInitialWindowHeight = (int)_termCharsHeight;
+            _consoleHandler.ConsoleInitialBufferWidth = _consoleHandler.ConsoleInitialWindowWidth;
+            _consoleHandler.ConsoleInitialBufferHeight = 0x1000;
+
+            // Initialize console (start process and configure handler).
             _consoleHandler.Initialize();
+
+            base.StartShell();
+        }
+
+        protected override void Open(SshConnectionService connService)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            base.Open(connService);
+
+            // Create console handler.
+            _consoleHandler = new ConsoleHandler("powershell");
+            _consoleHandler.ConsoleTitle = string.Format("{0} - channel {1}",
+                _connService.Client.Connection.ToString(), this.ServerChannel);
+            _consoleHandler.InjectionDllFileName = SshTerminalChannel.InjectionDllFileName;
         }
 
         protected override void InternalClose()
@@ -76,6 +111,22 @@ namespace WindowsSshServer
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            WriteTerminalData(data);
+
+            if (!_isDisposed) base.ProcessData(data);
+        }
+
+        protected override void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            WriteTerminalData(data);
+
+            if (!_isDisposed) base.ProcessExtendedData(dataType, data);
+        }
+
+        protected void WriteTerminalData(byte[] data)
+        {
             // Paste received data to console.
             var pasteInfo = _consoleHandler.ConsolePasteInfo;
 
@@ -97,7 +148,7 @@ namespace WindowsSshServer
                         data.Length, out numBytesWritten))
                     {
                         // Free allocated memory.
-                        WinApi.VirtualFreeEx(_consoleHandler.ProcessHandle, pRemoteMemory, 0, 
+                        WinApi.VirtualFreeEx(_consoleHandler.ProcessHandle, pRemoteMemory, 0,
                             WinApi.MEM_RELEASE);
                         return;
                     }
@@ -114,15 +165,13 @@ namespace WindowsSshServer
                 pasteInfo.RequestEvent.Set();
                 pasteInfo.ResponseEvent.WaitOne();
             }
-
-            if (_isDisposed) base.ProcessData(data);
         }
 
-        protected override void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
+        protected byte[] ReadNewTerminalData()
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+            //
 
-            base.ProcessExtendedData(dataType, data);
+            return null;
         }
     }
 }

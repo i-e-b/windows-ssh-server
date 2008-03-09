@@ -12,13 +12,13 @@ namespace SshDotNet
         public event EventHandler<EventArgs> EofSent;
         public event EventHandler<EventArgs> EofReceived;
         public event EventHandler<EventArgs> Closed;
-        public event EventHandler<EventArgs> DataReceived;
+        public event EventHandler<DataReceivedEventArgs> DataReceived;
 
         protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
         protected bool _eofReceived;                 // True if EOF (end of file) message has been received.
 
         protected SshConnectionService _connService; // Connection service.
-        
+
         private bool _isDisposed = false;            // True if object has been disposed.
 
         public SshChannel(ChannelOpenRequestEventArgs requestEventArgs)
@@ -103,6 +103,11 @@ namespace SshDotNet
             get { return _connService; }
         }
 
+        public bool IsDisposed
+        {
+            get { return _isDisposed; }
+        }
+
         public void SendEof()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -118,7 +123,7 @@ namespace SshDotNet
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            InternalClose();   
+            InternalClose();
         }
 
         protected internal virtual void Open(SshConnectionService connService)
@@ -158,16 +163,22 @@ namespace SshDotNet
             {
                 case "signal":
                     // Process signal.
-                    var signalName = msgReader.ReadString();
+                    ProcessSignal(msgReader.ReadString());
 
-                    ProcessSignal(signalName);
+                    if (wantReply)
+                    {
+                        _connService.SendMsgChannelSuccess(this);
+                        return;
+                    }
 
                     break;
                 default:
                     // Unrecognised request type.
-                    _connService.SendMsgChannelFailure(this);
                     break;
             }
+
+            // Request has failed.
+            if (wantReply) _connService.SendMsgChannelFailure(this);
         }
 
         protected internal virtual void ProcessWindowAdjust(uint bytesToRead)
@@ -182,7 +193,7 @@ namespace SshDotNet
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             // Raise event.
-            OnDataReceived(new EventArgs());
+            OnDataReceived(new DataReceivedEventArgs());
         }
 
         protected internal virtual void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
@@ -190,7 +201,7 @@ namespace SshDotNet
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             // Raise event.
-            OnDataReceived(new EventArgs());
+            OnDataReceived(new DataReceivedEventArgs(dataType));
         }
 
         protected internal virtual void ProcessSignal(string signalName)
@@ -223,7 +234,7 @@ namespace SshDotNet
 
             if (EofReceived != null) EofReceived(this, e);
         }
-        
+
         protected virtual void OnClosed(EventArgs e)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -231,7 +242,7 @@ namespace SshDotNet
             if (Closed != null) Closed(this, e);
         }
 
-        protected virtual void OnDataReceived(EventArgs e)
+        protected virtual void OnDataReceived(DataReceivedEventArgs e)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
@@ -239,80 +250,23 @@ namespace SshDotNet
         }
     }
 
-    public struct TerminalMode
+    public class DataReceivedEventArgs : EventArgs
     {
-        public TerminalModeOpCode OpCode;
-        public uint Argument;
-
-        public TerminalMode(TerminalModeOpCode opCode, uint argument)
+        public DataReceivedEventArgs()
+            : this(SshExtendedDataType.Normal)
         {
-            this.OpCode = opCode;
-            this.Argument = argument;
         }
-    }
 
-    public enum TerminalModeOpCode : byte
-    {
-        TtyOpEnd = 0,
+        public DataReceivedEventArgs(SshExtendedDataType dataType)
+            : base()
+        {
+            this.DataType = dataType;
+        }
 
-        VIntr = 1,
-        VQuit,
-        VErase,
-        VKill,
-        VEof,
-        VEol,
-        VEol2,
-        VStart,
-        VStop,
-        VSusp,
-        VDSusp,
-        VReprint,
-        VWErase,
-        VLNext,
-        VFlush,
-        VSwitch,
-        VStatus,
-        VDiscard,
-
-        IgnPar = 30,
-        ParMrk,
-        InPCk,
-        IStrip,
-        INLCR,
-        IgnCR,
-        ICRNL,
-        IUCLC,
-        IXOn,
-        IXAny,
-        IXOff,
-        IMaxBel,
-
-        ISig = 50,
-        ICanon,
-        XCase,
-        Echo,
-        EchoE,
-        EchoK,
-        EchoNL,
-        NoFlsh,
-        TOStop,
-        IExten,
-        EchoCtl,
-        EchoKE,
-        PendIn,
-
-        OPost = 70,
-        OLCUC,
-        ONLCR,
-        OCRNL,
-        ONLRet,
-
-        CS7 = 90,
-        CS8,
-        ParEnb,
-        ParOdd,
-
-        TtyOpISpeed = 128,
-        TtyOpOSpeed
+        public SshExtendedDataType DataType
+        {
+            get;
+            protected set;
+        }
     }
 }

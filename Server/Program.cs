@@ -14,7 +14,7 @@ namespace WindowsSshServer
         static void Main()
         {
             // Check if application is running as service.
-            if (Environment.UserName == "SYSTEM")
+            if (Environment.UserName == "SYSTEM" && !Environment.UserInteractive)
             {
                 // Run service.
                 using (var service = new ServerService())

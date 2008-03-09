@@ -663,6 +663,7 @@ namespace SshDotNet
 
     public enum SshExtendedDataType : uint
     {
+        Normal = 0,
         StdErr = 1
     }
 

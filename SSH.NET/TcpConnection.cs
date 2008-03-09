@@ -108,5 +108,10 @@ namespace SshDotNet
                 _tcpClient = null;
             }
         }
+
+        public override string ToString()
+        {
+            return _localEp.ToString();
+        }
     }
 }

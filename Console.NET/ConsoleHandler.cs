@@ -15,9 +15,10 @@ namespace ConsoleDotNet
 {
     public sealed class ConsoleHandler : IDisposable
     {
-        public event EventHandler<EventArgs> ConsoleClose;
-        public event EventHandler<EventArgs> ConsoleWindowResize;
-        public event EventHandler<EventArgs> ConsoleBufferResize;
+        public event EventHandler<EventArgs> ConsoleOpened;
+        public event EventHandler<EventArgs> ConsoleClosed;
+        public event EventHandler<EventArgs> ConsoleWindowResized;
+        public event EventHandler<EventArgs> ConsoleBufferResized;
 
         private SharedMemory<ConsoleParams> _consoleParams;
         private SharedMemory<CONSOLE_SCREEN_BUFFER_INFO> _consoleScreenInfo;
@@ -29,18 +30,27 @@ namespace ConsoleDotNet
         private SharedMemory<ConsoleSizeInfo> _consoleNewSizeInfo;
         private SharedMemory<SIZE> _consoleNewScrollPos;
 
-        private SafeWaitHandle _procSafeWaitHandle;
-        private Thread _monitorThread;
+        private bool _consoleVisible;               // True if terminal window is currently visible.
 
+        private SafeWaitHandle _procSafeWaitHandle; // Wait handle to detect when process exits.
+        private Thread _monitorThread;              // Thread for monitoring events received from console.
+
+        // Native information about console process and hook.
         private IntPtr _hProcess;
         private IntPtr _hKernel32;
         private IntPtr _procBaseAddress;
         private PROCESS_INFORMATION _procInfo;
-        private Process _process;
+        private Process _proc;
         private int _threadId;
         private IntPtr _hModule;
 
-        private bool _isDisposed = false; // True if object has been disposed.
+        private bool _isDisposed = false;           // True if object has been disposed.
+
+        public ConsoleHandler(string commandLine)
+            : this()
+        {
+            this.CommandLine = commandLine;
+        }
 
         public ConsoleHandler()
         {
@@ -54,6 +64,8 @@ namespace ConsoleDotNet
             _consoleMouseEvent = new SharedMemory<MOUSE_EVENT_RECORD>();
             _consoleNewSizeInfo = new SharedMemory<ConsoleSizeInfo>();
             _consoleNewScrollPos = new SharedMemory<SIZE>();
+
+            _consoleVisible = false;
         }
 
         ~ConsoleHandler()
@@ -81,17 +93,11 @@ namespace ConsoleDotNet
                 // Close console window.
                 unsafe
                 {
-                    try
-                    {
-                        ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
+                    ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
 
-                        if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
-                            WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
-                                IntPtr.Zero, IntPtr.Zero);
-                    }
-                    catch (AccessViolationException)
-                    {
-                    }
+                    if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
+                        WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
+                            IntPtr.Zero, IntPtr.Zero);
                 }
 
                 // Dispose shared memory objects.
@@ -167,6 +173,53 @@ namespace ConsoleDotNet
             get { return _consoleNewScrollPos; }
         }
 
+        public bool ConsoleVisible
+        {
+            get
+            {
+                return _consoleVisible;
+            }
+            set
+            {
+                _consoleVisible = value;
+
+                // Check if process has been started yet.
+                if (_hProcess == IntPtr.Zero) return;
+
+                unsafe
+                {
+                    ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
+
+                    WinApi.ShowWindow(consoleParams->ConsoleWindowHandle,
+                        _consoleVisible ? WindowShowStyle.Show : WindowShowStyle.Hide);
+                }
+            }
+        }
+
+        public int ConsoleInitialWindowWidth
+        {
+            get;
+            set;
+        }
+
+        public int ConsoleInitialWindowHeight
+        {
+            get;
+            set;
+        }
+
+        public int ConsoleInitialBufferWidth
+        {
+            get;
+            set;
+        }
+
+        public int ConsoleInitialBufferHeight
+        {
+            get;
+            set;
+        }
+
         public IntPtr ProcessHandle
         {
             get { return _hProcess; }
@@ -175,13 +228,31 @@ namespace ConsoleDotNet
 
         public Process Process
         {
-            get { return _process; }
+            get { return _proc; }
         }
 
         public int ThreadId
         {
             get { return _threadId; }
             set { _threadId = value; }
+        }
+
+        public string CommandLine
+        {
+            get;
+            set;
+        }
+
+        public string ConsoleTitle
+        {
+            get;
+            set;
+        }
+
+        public IDictionary<string, string> EnvironmentVars
+        {
+            get;
+            set;
         }
 
         public string InjectionDllFileName
@@ -211,7 +282,7 @@ namespace ConsoleDotNet
             if (retValue == WinApi.WAIT_TIMEOUT) throw new TimeoutException();
 
             // Create wait handle for console process.
-            _procSafeWaitHandle = new SafeWaitHandle(_process.Handle, false);
+            _procSafeWaitHandle = new SafeWaitHandle(_procInfo.hProcess, false);
 
             // Set language of console window.
             unsafe
@@ -227,7 +298,7 @@ namespace ConsoleDotNet
             _monitorThread = new Thread(new ThreadStart(MonitorThread));
             _monitorThread.Start();
 
-            // Resume thread to monitor hook.
+            // Resume monitor thread.
             unsafe
             {
                 ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
@@ -237,6 +308,9 @@ namespace ConsoleDotNet
                 if (WinApi.ResumeThread(hHookThread) == -1) throw new Win32Exception();
                 WinApi.CloseHandle(hHookThread);
             }
+
+            // Raise event.
+            if (ConsoleOpened != null) ConsoleOpened(this, new EventArgs());
         }
 
         public ConsoleParams GetConsoleParameters()
@@ -271,7 +345,7 @@ namespace ConsoleDotNet
                     _consoleScreenInfo.Get();
                 CHAR_INFO[,] buffer = new CHAR_INFO[consoleScreenInfo->dwSize.X,
                     consoleScreenInfo->dwSize.Y];
-                
+
                 fixed (CHAR_INFO* dst = buffer)
                 {
                     WinApi.CopyMemory(new IntPtr(dst), new IntPtr(_consoleBuffer.Get()), buffer.Length
@@ -340,8 +414,8 @@ namespace ConsoleDotNet
                             consoleParams->Columns = columns;
                             consoleParams->Rows = rows;
 
-                            Console.WriteLine("New window size: {0}x{1}", consoleParams->Columns,
-                                consoleParams->Rows);
+                            // Raise event.
+                            if (ConsoleWindowResized != null) ConsoleWindowResized(this, new EventArgs());
                         }
 
                         // Check if buffer size has changed.
@@ -352,8 +426,8 @@ namespace ConsoleDotNet
                             consoleParams->BufferColumns = bufferColumns;
                             consoleParams->BufferRows = bufferRows;
 
-                            Console.WriteLine("New buffer size: {0}x{1}", consoleParams->BufferColumns,
-                                consoleParams->BufferRows);
+                            // Raise event.
+                            if (ConsoleBufferResized != null) ConsoleBufferResized(this, new EventArgs());
                         }
                     }
                 }
@@ -365,8 +439,8 @@ namespace ConsoleDotNet
             {
                 if (procWaitHandle != null) procWaitHandle.Close();
 
-                // Raise event: console has closed.
-                if (ConsoleClose != null) ConsoleClose(this, new EventArgs());
+                // Raise event.
+                if (ConsoleClosed != null) ConsoleClosed(this, new EventArgs());
             }
         }
 
@@ -379,8 +453,8 @@ namespace ConsoleDotNet
 
             startupInfo.cb = Marshal.SizeOf(startupInfo);
             startupInfo.dwFlags = StartFlags.STARTF_USESHOWWINDOW;
-            startupInfo.wShowWindow = ShowWindow.Show;
-            startupInfo.lpTitle = "Console";
+            startupInfo.wShowWindow = _consoleVisible ? WindowShowStyle.Show : WindowShowStyle.Hide;
+            startupInfo.lpTitle = this.ConsoleTitle ?? "Console";
 
             SECURITY_ATTRIBUTES procAttrs = new SECURITY_ATTRIBUTES();
             SECURITY_ATTRIBUTES threadAttrs = new SECURITY_ATTRIBUTES();
@@ -388,15 +462,15 @@ namespace ConsoleDotNet
             procAttrs.nLength = Marshal.SizeOf(procAttrs);
             threadAttrs.nLength = Marshal.SizeOf(threadAttrs);
 
-            retValue = WinApi.CreateProcess(null, "powershell", ref procAttrs, ref threadAttrs, false,
+            // Start new console process.
+            retValue = WinApi.CreateProcess(null, this.CommandLine, ref procAttrs, ref threadAttrs, false,
                 CreationFlags.CREATE_NEW_CONSOLE | CreationFlags.CREATE_SUSPENDED, IntPtr.Zero, null,
                 ref startupInfo, out _procInfo);
             if (!retValue) throw new Win32Exception(Marshal.GetLastWin32Error(),
                 "Unable to create new console process.");
 
-            // Start new console process.
-            _process = Process.GetProcessById(_procInfo.dwProcessId);
-            
+            _proc = Process.GetProcessById(_procInfo.dwProcessId);
+
             // Create objects in shared memory.
             CreateSharedObjects(_procInfo.dwProcessId);
 
@@ -409,10 +483,10 @@ namespace ConsoleDotNet
                 consoleParams->ParentProcessId = Process.GetCurrentProcess().Id;
                 consoleParams->NotificationTimeout = 10;
                 consoleParams->RefreshInterval = 100;
-                consoleParams->Rows = 25;
-                consoleParams->Columns = 80;
-                consoleParams->BufferRows = 200;
-                consoleParams->BufferColumns = 80;
+                consoleParams->Rows = this.ConsoleInitialWindowHeight;
+                consoleParams->Columns = this.ConsoleInitialWindowWidth;
+                consoleParams->BufferRows = this.ConsoleInitialBufferHeight;
+                consoleParams->BufferColumns = this.ConsoleInitialBufferWidth;
             }
         }
 

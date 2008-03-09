@@ -274,8 +274,6 @@ namespace WindowsSshServer
         {
             var channel = new SshTerminalChannel(e);
 
-            channel.Initialize();
-
             e.Channel = channel;
             // e.FailureReason = SshChannelOpenFailureReason.UnknownChannelType;
         }

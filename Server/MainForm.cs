@@ -27,6 +27,23 @@ namespace WindowsSshServer
             InitializeComponent();
         }
 
+        protected List<SshTerminalChannel> GetAllTerminalChannels()
+        {
+            var list = new List<SshTerminalChannel>();
+
+            // Add each terminal channel to list.
+            foreach (var client in _service.TcpServer.Clients)
+            {
+                foreach (var channel in client.ConnectionService.Channels)
+                {
+                    if (channel is SshTerminalChannel)
+                        list.Add((SshTerminalChannel)channel);
+                }
+            }
+
+            return list;
+        }
+
         private void MainForm_Load(object sender, EventArgs e)
         {
             // Position form within screen.
@@ -94,13 +111,34 @@ namespace WindowsSshServer
                 rsaAlg.ExportKey(fileStream);
         }
 
+        private void closeAllTerminalsButton_Click(object sender, EventArgs e)
+        {
+            // Close all terminals.
+            var terminalChannels = GetAllTerminalChannels();
+
+            terminalChannels.ForEach(channel => channel.Close());
+        }
+
+        private void showAllTerminalsCheckBox_CheckedChanged(object sender, EventArgs e)
+        {
+            // Show/hide all terminals.
+            var terminalChannels = GetAllTerminalChannels();
+
+            terminalChannels.ForEach(channel => channel.TerminalVisible
+                = showAllTerminalsCheckBox.Checked);
+        }
+
         private void updateStatusTimer_Tick(object sender, EventArgs e)
         {
+            // Enable/disable controls.
             startButton.Enabled = !_service.TcpServer.IsRunning;
             stopButton.Enabled = _service.TcpServer.IsRunning;
 
+            // Update status text.
             statusLabel.Text = _service.TcpServer.IsRunning ? "Running" : "Stopped";
             clientCountLabel.Text = string.Format("{0} clients", _service.TcpServer.Clients.Count);
+
+            activeSessionsLabel.Text = GetAllTerminalChannels().Count.ToString();
         }
     }
 }

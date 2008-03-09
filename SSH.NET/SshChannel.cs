@@ -165,13 +165,9 @@ namespace SshDotNet
                     // Process signal.
                     ProcessSignal(msgReader.ReadString());
 
-                    if (wantReply)
-                    {
-                        _connService.SendMsgChannelSuccess(this);
-                        return;
-                    }
+                    if (wantReply) _connService.SendMsgChannelSuccess(this);
 
-                    break;
+                    return;
                 default:
                     // Unrecognised request type.
                     break;

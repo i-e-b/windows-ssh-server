@@ -461,7 +461,7 @@ namespace ConsoleDotNet
 
             procAttrs.nLength = Marshal.SizeOf(procAttrs);
             threadAttrs.nLength = Marshal.SizeOf(threadAttrs);
-
+            
             // Start new console process.
             retValue = WinApi.CreateProcess(null, this.CommandLine, ref procAttrs, ref threadAttrs, false,
                 CreationFlags.CREATE_NEW_CONSOLE | CreationFlags.CREATE_SUSPENDED, IntPtr.Zero, null,

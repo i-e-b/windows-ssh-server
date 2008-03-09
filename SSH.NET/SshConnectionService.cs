@@ -378,15 +378,21 @@ namespace SshDotNet
 
             switch (requestName)
             {
-                default:
-                    if (wantReply)
-                    {
-                        // Unrecognised request name.
-                        SendMsgRequestFailure();
-                    }
+                case "tcpip-forward":
+                    // not implemented
+
+                    //if (wantReply) SendMsgRequestSuccess(null);
+                    
+                    //return;
 
                     break;
+                default:
+                    // Unrecognised request type.
+                    break;
             }
+
+            // Request has failed.
+            if (wantReply) SendMsgRequestFailure();
         }
 
         protected void ProcessMsgRequestSuccess(SshStreamReader msgReader)

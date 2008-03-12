@@ -68,7 +68,11 @@ namespace SshDotNet
                     if (disposing)
                     {
                         // Dispose managed resources.
-                        if (_authTimeoutTimer != null) _authTimeoutTimer.Dispose();
+                        if (_authTimeoutTimer != null)
+                        {
+                            _authTimeoutTimer.Dispose();
+                            _authTimeoutTimer = null;
+                        }
                     }
 
                     // Dispose unmanaged resources.

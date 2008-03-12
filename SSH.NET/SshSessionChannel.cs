@@ -139,9 +139,6 @@ namespace SshDotNet
 
         protected virtual void OnPseudoTerminalRequested(EventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-            // Raise event.
             if (PseudoTerminalRequested != null) PseudoTerminalRequested(this, e);
         }
 

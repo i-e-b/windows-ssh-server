@@ -194,8 +194,6 @@ namespace SshDotNet
 
         protected internal virtual void ProcessExtendedData(SshExtendedDataType dataType, byte[] data)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             // Raise event.
             OnDataReceived(new DataReceivedEventArgs(dataType));
         }
@@ -212,36 +210,26 @@ namespace SshDotNet
 
         protected virtual void OnOpened(EventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (Opened != null) Opened(this, e);
         }
 
         protected virtual void OnEofSent(EventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (EofSent != null) EofSent(this, e);
         }
 
         protected virtual void OnEofReceived(EventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (EofReceived != null) EofReceived(this, e);
         }
 
         protected virtual void OnClosed(EventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (Closed != null) Closed(this, e);
         }
 
         protected virtual void OnDataReceived(DataReceivedEventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (DataReceived != null) DataReceived(this, e);
         }
     }

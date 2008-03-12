@@ -80,6 +80,8 @@ namespace SshDotNet
         protected SshStreamReader _streamReader;         // Reads SSH data from stream.
         protected Thread _receiveThread;                 // Thread on which to wait for received data.
 
+        protected object _streamLock = new object();
+
         private bool _isDisposed = false;                // True if object has been disposed.
 
         public SshClient(IConnection connection)
@@ -277,12 +279,7 @@ namespace SshDotNet
 
         public bool IsConnected
         {
-            get
-            {
-                if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
-                return _stream != null;
-            }
+            get { return _stream != null; }
         }
 
         public bool IsDisposed
@@ -383,70 +380,73 @@ namespace SshDotNet
         {
             //if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            // Check if connection is already closed.
-            if (_stream == null) return;
+            lock (_streamLock)
+            {
+                // Check if connection is already closed.
+                if (_stream == null) return;
 
-            // Stop each service.
-            foreach (var service in _services) service.Stop();
+                // Stop each service.
+                foreach (var service in _services) service.Stop();
 
-            // Dispose objects for data transmission.
-            if (_stream != null)
-            {
-                _stream.Dispose();
-                _stream = null;
-            }
-            if (_streamWriter != null)
-            {
-                _streamWriter.Close();
-                _streamWriter = null;
-            }
-            if (_streamReader != null)
-            {
-                _streamReader.Close();
-                _streamReader = null;
-            }
-            if (_receiveThread != null && Thread.CurrentThread != _receiveThread)
-            {
-                _receiveThread.Abort();
-                _receiveThread = null;
-            }
+                // Dispose objects for data transmission.
+                if (_stream != null)
+                {
+                    _stream.Dispose();
+                    _stream = null;
+                }
+                if (_streamWriter != null)
+                {
+                    _streamWriter.Close();
+                    _streamWriter = null;
+                }
+                if (_streamReader != null)
+                {
+                    _streamReader.Close();
+                    _streamReader = null;
+                }
+                if (_receiveThread != null && Thread.CurrentThread != _receiveThread)
+                {
+                    _receiveThread.Abort();
+                    _receiveThread = null;
+                }
 
-            // Dispose algorithms (current and new).
-            DisposeCurrentAlgorithms();
+                // Dispose algorithms (current and new).
+                DisposeCurrentAlgorithms();
 
-            if (_newEncAlgCtoS != null)
-            {
-                _newEncAlgCtoS.Dispose();
-                _newEncAlgCtoS = null;
-            }
-            if (_newEncAlgStoC != null)
-            {
-                _newEncAlgStoC.Dispose();
-                _newEncAlgStoC = null;
-            }
-            if (_newMacAlgCtoS != null)
-            {
-                _newMacAlgCtoS.Dispose();
-                _newMacAlgCtoS = null;
-            }
-            if (_newMacAlgStoC != null)
-            {
-                _newMacAlgStoC.Dispose();
-                _newMacAlgStoC = null;
-            }
-            if (_newCompAlgCtoS != null)
-            {
-                _newCompAlgCtoS.Dispose();
-                _newCompAlgCtoS = null;
-            }
-            if (_newCompAlgStoC != null)
-            {
-                _newCompAlgStoC.Dispose();
-                _newCompAlgStoC = null;
-            }
+                if (_newEncAlgCtoS != null)
+                {
+                    _newEncAlgCtoS.Dispose();
+                    _newEncAlgCtoS = null;
+                }
+                if (_newEncAlgStoC != null)
+                {
+                    _newEncAlgStoC.Dispose();
+                    _newEncAlgStoC = null;
+                }
+                if (_newMacAlgCtoS != null)
+                {
+                    _newMacAlgCtoS.Dispose();
+                    _newMacAlgCtoS = null;
+                }
+                if (_newMacAlgStoC != null)
+                {
+                    _newMacAlgStoC.Dispose();
+                    _newMacAlgStoC = null;
+                }
+                if (_newCompAlgCtoS != null)
+                {
+                    _newCompAlgCtoS.Dispose();
+                    _newCompAlgCtoS = null;
+                }
+                if (_newCompAlgStoC != null)
+                {
+                    _newCompAlgStoC.Dispose();
+                    _newCompAlgStoC = null;
+                }
 
-            // Disconnect using connection object.
-            if (_connection != null) _connection.Disconnect(remotely);
+                // Disconnect using connection object.
+                if (_connection != null) _connection.Disconnect(remotely);
+            }
 
             // Client has disconnected.
             OnDisconnected(new SshDisconnectedEventArgs(remotely, reason, description, language));
@@ -583,90 +583,93 @@ namespace SshDotNet
             byte[] compressedPayload;
             byte[] mac;
 
-            try
+            lock (_streamLock)
             {
-                if (_encAlgCtoS != null)
+                try
                 {
-                    // Packet is encrypted. Use crypto stream for reading.
-                    cachedStream = new CachedStream(_stream);
-                    cryptoStream = new CryptoStream(cachedStream, _cryptoTransformCtoS, CryptoStreamMode.Read);
-                }
-                else
-                {
-                    // Packet is unencrypted. Use normal network stream for reading.
-                    cryptoStream = _stream;
-                }
-
-                var cryptoStreamReader = new SshStreamReader(cryptoStream);
-
-                // Read packet length information.
-                packetLength = cryptoStreamReader.ReadUInt32();
-                paddingLength = cryptoStreamReader.ReadByte();
-
-                if (paddingLength < 4)
-                {
-                    // Invalid padding length.
-                    Disconnect(SshDisconnectReason.MacError, string.Format(
-                        "Invalid padding length", _receivePacketSeqNumber));
-                    throw new DisconnectedException();
-                }
-
-                // Read payload data.
-                compressedPayload = new byte[packetLength - 1 - paddingLength];
-
-                cryptoStreamReader.Read(compressedPayload, 0, compressedPayload.Length);
-
-                // Skip bytes of random padding.
-                byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
-
-                // Check if currently using MAC algorithm.
-                if (_macAlgCtoS != null)
-                {
-                    // Read MAC (Message Authentication Code).
-                    // MAC is always unencrypted.
-                    mac = new byte[_macAlgCtoS.DigestLength];
-                    int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
-                    int macBytesLeft = mac.Length - macBytesRead;
-
-                    if (macBytesLeft > 0) _streamReader.Read(mac, macBytesRead, macBytesLeft);
-
-                    if (macBytesRead > 0)
+                    if (_encAlgCtoS != null)
                     {
-                        // Hack: recreate decryptor with correct IV.
-                        _cryptoTransformCtoS.Dispose();
-                        _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
-                            cachedStream.GetBufferEnd(0, _cryptoTransformCtoS.InputBlockSize));
+                        // Packet is encrypted. Use crypto stream for reading.
+                        cachedStream = new CachedStream(_stream);
+                        cryptoStream = new CryptoStream(cachedStream, _cryptoTransformCtoS, CryptoStreamMode.Read);
+                    }
+                    else
+                    {
+                        // Packet is unencrypted. Use normal network stream for reading.
+                        cryptoStream = _stream;
                     }
 
-                    // Verify MAC of received packet.
-                    var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
-                        paddingLength, compressedPayload, padding);
+                    var cryptoStreamReader = new SshStreamReader(cryptoStream);
 
-                    if (!mac.ArrayEquals(expectedMac))
+                    // Read packet length information.
+                    packetLength = cryptoStreamReader.ReadUInt32();
+                    paddingLength = cryptoStreamReader.ReadByte();
+
+                    if (paddingLength < 4)
                     {
-                        // Invalid MAC.
+                        // Invalid padding length.
                         Disconnect(SshDisconnectReason.MacError, string.Format(
-                            "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
+                            "Invalid padding length", _receivePacketSeqNumber));
                         throw new DisconnectedException();
                     }
+
+                    // Read payload data.
+                    compressedPayload = new byte[packetLength - 1 - paddingLength];
+
+                    cryptoStreamReader.Read(compressedPayload, 0, compressedPayload.Length);
+
+                    // Skip bytes of random padding.
+                    byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
+
+                    // Check if currently using MAC algorithm.
+                    if (_macAlgCtoS != null)
+                    {
+                        // Read MAC (Message Authentication Code).
+                        // MAC is always unencrypted.
+                        mac = new byte[_macAlgCtoS.DigestLength];
+                        int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
+                        int macBytesLeft = mac.Length - macBytesRead;
+
+                        if (macBytesLeft > 0) _streamReader.Read(mac, macBytesRead, macBytesLeft);
+
+                        if (macBytesRead > 0)
+                        {
+                            // Hack: recreate decryptor with correct IV.
+                            _cryptoTransformCtoS.Dispose();
+                            _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
+                                cachedStream.GetBufferEnd(0, _cryptoTransformCtoS.InputBlockSize));
+                        }
+
+                        // Verify MAC of received packet.
+                        var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
+                            paddingLength, compressedPayload, padding);
+
+                        if (!mac.ArrayEquals(expectedMac))
+                        {
+                            // Invalid MAC.
+                            Disconnect(SshDisconnectReason.MacError, string.Format(
+                                "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
+                            throw new DisconnectedException();
+                        }
+                    }
+                    else
+                    {
+                        // Set MAC to empty array.
+                        mac = new byte[0];
+                    }
                 }
-                else
+                catch (CryptographicException exCrypto)
                 {
-                    // Set MAC to empty array.
-                    mac = new byte[0];
-                }
-            }
-            catch (CryptographicException exCrypto)
-            {
-                // Check if at end of stream.
-                if (_stream.ReadByte() == -1)
-                {
-                    Disconnect(true);
-                    throw new DisconnectedException();
-                }
-                else
-                {
-                    throw exCrypto;
+                    // Check if at end of stream.
+                    if (_stream.ReadByte() == -1)
+                    {
+                        Disconnect(true);
+                        throw new DisconnectedException();
+                    }
+                    else
+                    {
+                        throw exCrypto;
+                    }
                 }
             }
 
@@ -1220,7 +1223,7 @@ namespace SshDotNet
             _newLanguageStoC = ChooseLanguage(langsStoC);
 
             // Raise event, key exchange has completed.
-            if (KeyExchangeInitialized != null) KeyExchangeInitialized(this,
+            if (KeyExchangeInitialized != null) OnKeyExchangeInitialized(
                 new SshKeyExchangeInitializedEventArgs(_hostKeyAlg));
         }
 
@@ -1598,30 +1601,27 @@ namespace SshDotNet
 
         protected virtual void OnConnected(EventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (Connected != null) Connected(this, new EventArgs());
         }
 
         protected virtual void OnDisconnected(SshDisconnectedEventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (Disconnected != null) Disconnected(this, e);
         }
 
         protected virtual void OnError(SshErrorEventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (Error != null) Error(this, new EventArgs());
         }
 
         protected virtual void OnDebugMessageReceived(SshDebugMessageReceivedEventArgs e)
         {
-            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
             if (DebugMessageReceived != null) DebugMessageReceived(this, e);
+        }
+
+        protected virtual void OnKeyExchangeInitialized(SshKeyExchangeInitializedEventArgs e)
+        {
+            if (KeyExchangeInitialized != null) KeyExchangeInitialized(this, e);
         }
 
         private void ReceiveData()

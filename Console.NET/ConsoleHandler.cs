@@ -44,6 +44,8 @@ namespace ConsoleDotNet
         private int _threadId;
         private IntPtr _hModule;
 
+        private object _disposeLock = new object();
+
         private bool _isDisposed = false;           // True if object has been disposed.
 
         public ConsoleHandler(string commandLine)
@@ -75,51 +77,54 @@ namespace ConsoleDotNet
 
         private void Dispose(bool disposing)
         {
-            if (!_isDisposed)
+            lock (_disposeLock)
             {
-                if (disposing)
+                if (!_isDisposed)
                 {
-                    // Dispose managed resources.
+                    if (disposing)
+                    {
+                        // Dispose managed resources.
+
+                        // Dispose wait handle.
+                        if (_procSafeWaitHandle != null) _procSafeWaitHandle.Dispose();
+
+                        // Abort monitor thread.
+                        if (_monitorThread != null) _monitorThread.Abort();
+
+                        // Close console window.
+                        unsafe
+                        {
+                            ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
+
+                            if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
+                                WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
+                                    IntPtr.Zero, IntPtr.Zero);
+                        }
+
+                        // Dispose shared memory objects.
+                        if (_consoleParams != null) _consoleParams.Dispose();
+                        if (_consoleScreenInfo != null) _consoleScreenInfo.Dispose();
+                        if (_consoleCursorInfo != null) _consoleCursorInfo.Dispose();
+                        if (_consoleBuffer != null) _consoleBuffer.Dispose();
+                        if (_consoleCopyInfo != null) _consoleCopyInfo.Dispose();
+                        if (_consolePasteInfo != null) _consolePasteInfo.Dispose();
+                        if (_consoleMouseEvent != null) _consoleMouseEvent.Dispose();
+                        if (_consoleNewSizeInfo != null) _consoleNewSizeInfo.Dispose();
+                        if (_consoleNewScrollPos != null) _consoleNewScrollPos.Dispose();
+
+                        //// Kill console process.
+                        //if (_process != null)
+                        //{
+                        //    _process.Kill();
+                        //    _process.Dispose();
+                        //}
+                    }
+
+                    // Dispose unmanaged resources.
                 }
 
-                // Dispose unmanaged resources.
-
-                // Dispose wait handle.
-                if (_procSafeWaitHandle != null) _procSafeWaitHandle.Dispose();
-
-                // Abort monitor thread.
-                if (_monitorThread != null) _monitorThread.Abort();
-
-                // Close console window.
-                unsafe
-                {
-                    ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
-
-                    if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
-                        WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
-                            IntPtr.Zero, IntPtr.Zero);
-                }
-
-                // Dispose shared memory objects.
-                if (_consoleParams != null) _consoleParams.Dispose();
-                if (_consoleScreenInfo != null) _consoleScreenInfo.Dispose();
-                if (_consoleCursorInfo != null) _consoleCursorInfo.Dispose();
-                if (_consoleBuffer != null) _consoleBuffer.Dispose();
-                if (_consoleCopyInfo != null) _consoleCopyInfo.Dispose();
-                if (_consolePasteInfo != null) _consolePasteInfo.Dispose();
-                if (_consoleMouseEvent != null) _consoleMouseEvent.Dispose();
-                if (_consoleNewSizeInfo != null) _consoleNewSizeInfo.Dispose();
-                if (_consoleNewScrollPos != null) _consoleNewScrollPos.Dispose();
-
-                //// Kill console process.
-                //if (_process != null)
-                //{
-                //    _process.Kill();
-                //    _process.Dispose();
-                //}
+                _isDisposed = true;
             }
-
-            _isDisposed = true;
         }
 
         public void Dispose()
@@ -461,7 +466,7 @@ namespace ConsoleDotNet
 
             procAttrs.nLength = Marshal.SizeOf(procAttrs);
             threadAttrs.nLength = Marshal.SizeOf(threadAttrs);
-            
+
             // Start new console process.
             retValue = WinApi.CreateProcess(null, this.CommandLine, ref procAttrs, ref threadAttrs, false,
                 CreationFlags.CREATE_NEW_CONSOLE | CreationFlags.CREATE_SUSPENDED, IntPtr.Zero, null,

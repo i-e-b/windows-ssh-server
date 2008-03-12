@@ -62,6 +62,11 @@ namespace SshDotNet
             get { return _remoteEp; }
         }
 
+        public bool IsConnected
+        {
+            get { return _tcpClient != null; }
+        }
+
         public Stream GetStream()
         {
             return _tcpClient.GetStream();

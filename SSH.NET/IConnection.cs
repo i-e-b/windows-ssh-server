@@ -8,8 +8,12 @@ namespace SshDotNet
 {
     public interface IConnection : IDisposable
     {
-        Stream GetStream();
+        bool IsConnected
+        {
+            get;
+        }
 
+        Stream GetStream();
         bool HandleException(SshClient client, Exception ex);
         void ConnectionEstablished();
         void Disconnect(bool remotely);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 
@@ -17,6 +18,7 @@ namespace WindowsSshServer
             set;
         }
 
+        protected Terminal _terminal;             // Terminal, which translates sent and received data.
         protected ConsoleHandler _consoleHandler; // Handles Windows console.
 
         private bool _isDisposed = false;         // True if object has been disposed.
@@ -111,7 +113,12 @@ namespace WindowsSshServer
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            WriteTerminalData(data);
+            /*
+             * Note: Need to send WM_KEYDOWN messages instead (in order to send special chars like arrows)?
+             * Check code in Console2 project.
+            */
+            // Write unescaped data to console.
+            WriteTerminalData(_terminal.UnescapeData(data));
 
             if (!_isDisposed) base.ProcessData(data);
         }
@@ -120,7 +127,8 @@ namespace WindowsSshServer
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            WriteTerminalData(data);
+            // Write unescaped data to console.
+            WriteTerminalData(_terminal.UnescapeData(data));
 
             if (!_isDisposed) base.ProcessExtendedData(dataType, data);
         }
@@ -172,6 +180,19 @@ namespace WindowsSshServer
             //
 
             return null;
+        }
+
+        protected override void OnPseudoTerminalAllocated(EventArgs e)
+        {
+            // Check type of terminal.
+            switch (_termEnvVar)
+            {
+                case "xterm":
+                    _terminal = new XtermTerminal();
+                    break;
+            }
+
+            base.OnPseudoTerminalAllocated(e);
         }
     }
 }

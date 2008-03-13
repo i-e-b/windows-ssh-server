@@ -9,7 +9,7 @@ namespace SshDotNet
 {
     public class SshSessionChannel : SshChannel
     {
-        public event EventHandler<EventArgs> PseudoTerminalRequested;
+        public event EventHandler<EventArgs> PseudoTerminalAllocated;
 
         protected string _termEnvVar;                  // TERM environment variable.
         protected uint _termCharsWidth;                // Width of terminal, in chars.
@@ -86,7 +86,7 @@ namespace SshDotNet
                     _envVars.Add("TERM", _termEnvVar);
 
                     // Raise event.
-                    OnPseudoTerminalRequested(new EventArgs());
+                    OnPseudoTerminalAllocated(new EventArgs());
 
                     if (wantReply) _connService.SendMsgChannelSuccess(this);
 
@@ -137,9 +137,9 @@ namespace SshDotNet
             base.Open(connService);
         }
 
-        protected virtual void OnPseudoTerminalRequested(EventArgs e)
+        protected virtual void OnPseudoTerminalAllocated(EventArgs e)
         {
-            if (PseudoTerminalRequested != null) PseudoTerminalRequested(this, e);
+            if (PseudoTerminalAllocated != null) PseudoTerminalAllocated(this, e);
         }
 
         protected void ReadTerminalModes(byte[] encodedModes)

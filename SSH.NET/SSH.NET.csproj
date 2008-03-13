@@ -99,6 +99,7 @@
     <Compile Include="SshStreamReader.cs" />
     <Compile Include="SshStreamWriter.cs" />
     <Compile Include="TcpConnection.cs" />
+    <Compile Include="Terminal.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Keys\dss-default.key" />

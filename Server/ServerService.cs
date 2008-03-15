@@ -288,7 +288,7 @@ namespace WindowsSshServer
             //
         }
 
-        private void Client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
+        private void client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
         {
             var client = (SshClient)sender;
 
@@ -315,7 +315,7 @@ namespace WindowsSshServer
         private void _tcpServer_ClientConnected(object sender, ClientEventArgs e)
         {
             e.Client.KeyExchangeInitialized += new EventHandler<SshKeyExchangeInitializedEventArgs>(
-                Client_KeyExchangeCompleted);
+                client_KeyExchangeCompleted);
 
             // Initialize authentication service.
             var authService = e.Client.AuthenticationService;
@@ -341,8 +341,8 @@ namespace WindowsSshServer
 
             connService.ChannelOpenRequest += new EventHandler<ChannelOpenRequestEventArgs>(
                 connService_ChannelOpenRequest);
-            connService.ChannelOpened += new EventHandler<EventArgs>(connService_ChannelOpened);
-            connService.ChannelClosed += new EventHandler<EventArgs>(connService_ChannelClosed);
+            connService.ChannelOpened += new EventHandler<ChannelEventArgs>(connService_ChannelOpened);
+            connService.ChannelClosed += new EventHandler<ChannelEventArgs>(connService_ChannelClosed);
 
             // Write to event log.
             LogClientEvent(e.Client, "Connected from server.", EventLogEntryType.Information);

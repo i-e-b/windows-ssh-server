@@ -53,8 +53,31 @@ namespace WindowsSshServer
             // Create service for server.
             _service = new ServerService();
 
+            _service.TcpServer.ClientConnected += new EventHandler<ClientEventArgs>(
+                tcpServer_ClientConnected);
+            _service.TcpServer.ClientDisconnected += new EventHandler<ClientEventArgs>(
+                tcpServer_ClientDisconnected);
+
             // Start server immediately.
             startButton.PerformClick();
+        }
+
+        private void connService_ChannelOpened(object sender, ChannelEventArgs e)
+        {
+            var terminalChannel = e.Channel as SshTerminalChannel;
+
+            terminalChannel.TerminalVisible = showAllTerminalsCheckBox.Checked;
+        }
+
+        private void tcpServer_ClientConnected(object sender, ClientEventArgs e)
+        {
+            e.Client.ConnectionService.ChannelOpened += new EventHandler<ChannelEventArgs>(
+                connService_ChannelOpened);
+        }
+
+        private void tcpServer_ClientDisconnected(object sender, ClientEventArgs e)
+        {
+            //
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)

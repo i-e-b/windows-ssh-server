@@ -9,8 +9,8 @@ namespace SshDotNet
     public class SshConnectionService : SshService
     {
         public event EventHandler<ChannelOpenRequestEventArgs> ChannelOpenRequest;
-        public event EventHandler<EventArgs> ChannelOpened;
-        public event EventHandler<EventArgs> ChannelClosed;
+        public event EventHandler<ChannelEventArgs> ChannelOpened;
+        public event EventHandler<ChannelEventArgs> ChannelClosed;
 
         protected List<SshChannel> _channels; // List of all currently open channels.
 
@@ -382,7 +382,7 @@ namespace SshDotNet
                     // not implemented
 
                     //if (wantReply) SendMsgRequestSuccess(null);
-                    
+
                     //return;
 
                     break;
@@ -419,6 +419,8 @@ namespace SshDotNet
             uint initialWindowSize = msgReader.ReadUInt32();
             uint maxPacketSize = msgReader.ReadUInt32();
 
+            SshChannel channel = null;
+
             // Check channel type.
             switch (channelType)
             {
@@ -429,7 +431,7 @@ namespace SshDotNet
 
                     if (ChannelOpenRequest != null) ChannelOpenRequest(this, channelRequestedEventArgs);
 
-                    var channel = channelRequestedEventArgs.Channel;
+                    channel = channelRequestedEventArgs.Channel;
 
                     // Check if channel was created.
                     if (channel != null)
@@ -474,8 +476,11 @@ namespace SshDotNet
                     break;
             }
 
-            // Raise event.
-            if (ChannelOpened != null) ChannelOpened(this, new EventArgs());
+            if (channel != null)
+            {
+                // Raise event.
+                if (ChannelOpened != null) ChannelOpened(this, new ChannelEventArgs(channel));
+            }
         }
 
         protected void ProcessMsgChannelOpenConfirmation(SshStreamReader msgReader)
@@ -526,7 +531,7 @@ namespace SshDotNet
                 _channels.Remove(channel);
 
                 // Raise event.
-                if (ChannelClosed != null) ChannelClosed(this, new EventArgs());
+                if (ChannelClosed != null) ChannelClosed(this, new ChannelEventArgs(channel));
             }
         }
 
@@ -598,6 +603,21 @@ namespace SshDotNet
             var data = msgReader.ReadByteString();
 
             channel.ProcessExtendedData(dataType, data);
+        }
+    }
+
+    public class ChannelEventArgs : EventArgs
+    {
+        public ChannelEventArgs(SshChannel channel)
+            : base()
+        {
+            this.Channel = channel;
+        }
+
+        public SshChannel Channel
+        {
+            get;
+            protected set;
         }
     }
 

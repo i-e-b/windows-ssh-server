@@ -113,12 +113,8 @@ namespace WindowsSshServer
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            /*
-             * Note: Need to send WM_KEYDOWN messages instead (in order to send special chars like arrows)?
-             * Check code in Console2 project.
-            */
             // Write unescaped data to console.
-            WriteTerminalData(_terminal.UnescapeData(data));
+            TerminalSendKeys(_terminal.UnescapeData(data));
 
             if (!_isDisposed) base.ProcessData(data);
         }
@@ -128,12 +124,12 @@ namespace WindowsSshServer
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
             // Write unescaped data to console.
-            WriteTerminalData(_terminal.UnescapeData(data));
+            TerminalSendKeys(_terminal.UnescapeData(data));
 
             if (!_isDisposed) base.ProcessExtendedData(dataType, data);
         }
 
-        protected void WriteTerminalData(byte[] data)
+        protected void TerminalPasteData(byte[] data)
         {
             // Paste received data to console.
             var pasteInfo = _consoleHandler.ConsolePasteInfo;
@@ -173,6 +169,41 @@ namespace WindowsSshServer
                 pasteInfo.RequestEvent.Set();
                 pasteInfo.ResponseEvent.WaitOne();
             }
+        }
+
+        protected void TerminalSendKeys(KeyData[] keys)
+        {
+            unsafe
+            {
+                var consoleParams = (ConsoleParams*)_consoleHandler.ConsoleParameters.Get();
+
+                foreach (var key in keys)
+                {
+                    // Get virtual-key code for key.
+                    IntPtr vKey = new IntPtr(key.IsVirtualKey ? key.Value : WinApi.VkKeyScan(
+                        (char)key.Value));
+
+                    // Send Key Down and then Key Up messages to console window.
+                    WinApi.PostMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_KEYDOWN, vKey,
+                        CreateWmKeyDownLParam(1, 0, false, false, 0));
+                    WinApi.PostMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_KEYUP, vKey,
+                        CreateWmKeyDownLParam(1, 0, false, true, 1));
+                }
+            }
+        }
+
+        protected IntPtr CreateWmKeyDownLParam(int repeatCount, byte scanCode, bool extendedKey,
+            bool keyWasDown, int transitionState)
+        {
+            return new IntPtr(
+                repeatCount                   // 0-15  repeat count
+                | (scanCode << 16)            // 16-23 scan code
+                | (extendedKey ? 1 : 0 << 24) // 24    extended key
+                | 0                           // 25-28 reserved
+                | 0                           // 29    context code
+                | (keyWasDown ? 1 : 0 << 30)  // 30    previous key state
+                | (transitionState << 31)     // 31    transition state
+                );
         }
 
         protected byte[] ReadNewTerminalData()

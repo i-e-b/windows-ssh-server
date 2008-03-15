@@ -467,9 +467,12 @@ namespace ConsoleDotNet
             procAttrs.nLength = Marshal.SizeOf(procAttrs);
             threadAttrs.nLength = Marshal.SizeOf(threadAttrs);
 
+            // Create environment variables.
+            IntPtr pEnvironment = IntPtr.Zero;
+
             // Start new console process.
             retValue = WinApi.CreateProcess(null, this.CommandLine, ref procAttrs, ref threadAttrs, false,
-                CreationFlags.CREATE_NEW_CONSOLE | CreationFlags.CREATE_SUSPENDED, IntPtr.Zero, null,
+                CreationFlags.CREATE_NEW_CONSOLE | CreationFlags.CREATE_SUSPENDED, pEnvironment, null,
                 ref startupInfo, out _procInfo);
             if (!retValue) throw new Win32Exception(Marshal.GetLastWin32Error(),
                 "Unable to create new console process.");

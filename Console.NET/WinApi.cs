@@ -36,6 +36,10 @@ namespace ConsoleDotNet
         public const int WM_NULL = 0x0000;
         public const int WM_CLOSE = 0x0010;
         public const int WM_INPUTLANGCHANGEREQUEST = 0x0050;
+        public const int WM_KEYDOWN = 0x0100;
+        public const int WM_KEYUP = 0x0101;
+        public const int WM_CHAR = 0x0102;
+        public const int WM_UNICHAR = 0x0109;
 
         [DllImport("user32", SetLastError = true)]
         public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int lpdwProcessId);
@@ -51,6 +55,9 @@ namespace ConsoleDotNet
 
         [DllImport("user32", SetLastError = true)]
         public static extern bool ShowWindow(IntPtr hWnd, WindowShowStyle nCmdShow);
+
+        [DllImport("user32", SetLastError = true)]
+        public static extern short VkKeyScan(char ch);
 
         [DllImport("kernel32", SetLastError = true)]
         public static extern IntPtr CopyMemory(IntPtr dest, IntPtr src, int size);

@@ -26,25 +26,14 @@ namespace SshDotNet
             }
         }
 
-        public byte[] EscapeData(byte[] input)
+        public byte[] EscapeData(KeyData[] input)
         {
-            using (var inputStream = new MemoryStream(input))
-            {
-                return EscapeData(inputStream);
-            }
+            //
+
+            return null;
         }
 
-        public byte[] EscapeData(Stream inputStream)
-        {
-            using (var outputStream = new MemoryStream())
-            {
-                //
-
-                return outputStream.ToArray();
-            }
-        }
-
-        public byte[] UnescapeData(byte[] input)
+        public KeyData[] UnescapeData(byte[] input)
         {
             using (var inputStream = new MemoryStream(input))
             {
@@ -52,43 +41,40 @@ namespace SshDotNet
             }
         }
 
-        public byte[] UnescapeData(Stream inputStream)
+        public KeyData[] UnescapeData(Stream inputStream)
         {
-            using (var outputStream = new MemoryStream())
+            var keys = new List<KeyData>();
+
+            // Read escaped data from input stream.
+            int inputByte;
+            KeyData outputKey;
+
+            while ((inputByte = inputStream.ReadByte()) != -1)
             {
-                // Read escaped data from input stream.
-                int inputByte;
-                byte outputByte;
-
-                while ((inputByte = inputStream.ReadByte()) != -1)
+                if (_bitMode == TerminalBitMode.Mode7Bit)
                 {
-                    outputByte = 0;
+                    if (inputByte == 27) // ESC
+                        outputKey = new KeyData(DecodeSequence7Bit(inputStream), true);
+                    else // Normal char
+                        outputKey = new KeyData((byte)inputByte, false);
+                }
+                else if (_bitMode == TerminalBitMode.Mode8Bit)
+                {
+                    //outputKey = new KeyData(DecodeSequence8Bit(inputStream), true);
 
-                    if (_bitMode == TerminalBitMode.Mode7Bit)
-                    {
-                        if (inputByte == 27) // ESC
-                            outputByte = DecodeSequence7Bit(inputStream);
-                        else // Normal char
-                            outputByte = (byte)inputByte;
-                    }
-                    else if (_bitMode == TerminalBitMode.Mode8Bit)
-                    {
-                        //outputByte = DecodeSequence8Bit(inputStream);
-
-                        // Normal char
-                        outputByte = (byte)inputByte;
-                    }
-                    else
-                    {
-                        throw new InvalidOperationException("Bit mode is not valid for unescaping data.");
-                    }
-
-                    // Output current byte.
-                    outputStream.WriteByte(outputByte);
+                    // Normal char
+                    outputKey = new KeyData((byte)inputByte, false);
+                }
+                else
+                {
+                    throw new InvalidOperationException("Bit mode is not valid for unescaping data.");
                 }
 
-                return outputStream.ToArray();
+                // Add current byte to output.
+                keys.Add(outputKey);
             }
+
+            return keys.ToArray();
         }
 
         protected byte DecodeSequence7Bit(Stream inputStream)
@@ -137,6 +123,18 @@ namespace SshDotNet
             }
 
             return (byte)inputStream.ReadByte();
+        }
+    }
+
+    public struct KeyData
+    {
+        public byte Value;
+        public bool IsVirtualKey;
+
+        public KeyData(byte value, bool isVirtualKey)
+        {
+            this.Value = value;
+            this.IsVirtualKey = isVirtualKey;
         }
     }
 

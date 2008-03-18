@@ -27,17 +27,17 @@ namespace WindowsSshServer
             InitializeComponent();
         }
 
-        protected List<SshTerminalChannel> GetAllTerminalChannels()
+        protected List<SshWinConsoleChannel> GetAllTerminalChannels()
         {
-            var list = new List<SshTerminalChannel>();
+            var list = new List<SshWinConsoleChannel>();
 
             // Add each terminal channel to list.
             foreach (var client in _service.TcpServer.Clients)
             {
                 foreach (var channel in client.ConnectionService.Channels)
                 {
-                    if (channel is SshTerminalChannel)
-                        list.Add((SshTerminalChannel)channel);
+                    if (channel is SshWinConsoleChannel)
+                        list.Add((SshWinConsoleChannel)channel);
                 }
             }
 
@@ -64,7 +64,7 @@ namespace WindowsSshServer
 
         private void connService_ChannelOpened(object sender, ChannelEventArgs e)
         {
-            var terminalChannel = e.Channel as SshTerminalChannel;
+            var terminalChannel = e.Channel as SshWinConsoleChannel;
 
             terminalChannel.TerminalVisible = showAllTerminalsCheckBox.Checked;
         }

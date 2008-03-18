@@ -104,7 +104,7 @@
     <Compile Include="ServerServiceInstaller.cs">
       <SubType>Component</SubType>
     </Compile>
-    <Compile Include="SshTerminalChannel.cs" />
+    <Compile Include="SshWinConsoleChannel.cs" />
     <Compile Include="SshTcpServer.cs" />
     <Compile Include="ServerService.cs">
       <SubType>Component</SubType>

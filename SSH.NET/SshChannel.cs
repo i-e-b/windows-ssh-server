@@ -14,6 +14,7 @@ namespace SshDotNet
         public event EventHandler<EventArgs> Closed;
         public event EventHandler<DataReceivedEventArgs> DataReceived;
 
+        protected bool _open;                        // True if channel is currently open.
         protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
         protected bool _eofReceived;                 // True if EOF (end of file) message has been received.
 
@@ -29,7 +30,9 @@ namespace SshDotNet
 
         public SshChannel(uint clientChannel, uint serverChannel, uint windowSize, uint maxPacketSize)
         {
+            _open = false;
             _eofSent = false;
+            _eofReceived = false;
 
             this.ClientChannel = clientChannel;
             this.ServerChannel = serverChannel;
@@ -62,6 +65,11 @@ namespace SshDotNet
             }
 
             _isDisposed = true;
+        }
+
+        public bool IsOpen
+        {
+            get { return _open; }
         }
 
         public bool IsEofSent
@@ -126,11 +134,28 @@ namespace SshDotNet
             InternalClose();
         }
 
+        protected void SendData(byte[] data)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            _connService.SendMsgChannelData(this, data);
+        }
+
+        protected void SendExtendedData(byte[] data, SshExtendedDataType dataType)
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            _connService.SendMsgChannelExtendedData(this, dataType, data);
+        }
+
         protected internal virtual void Open(SshConnectionService connService)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            if (_open) return;
+
             _connService = connService;
+            _open = true;
 
             // Raise event.
             OnOpened(new EventArgs());
@@ -138,8 +163,12 @@ namespace SshDotNet
 
         protected virtual void InternalClose()
         {
+            if (!_open) return;
+
             // Send close message if client is connected.
             if (_connService.Client.IsConnected) _connService.SendMsgChannelClose(this);
+
+            _open = false;
 
             // Raise event.
             OnClosed(new EventArgs());
@@ -166,7 +195,6 @@ namespace SshDotNet
                     ProcessSignal(msgReader.ReadString());
 
                     if (wantReply) _connService.SendMsgChannelSuccess(this);
-
                     return;
                 default:
                     // Unrecognised request type.

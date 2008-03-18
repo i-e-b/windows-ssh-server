@@ -19,6 +19,7 @@ namespace ConsoleDotNet
         public event EventHandler<EventArgs> ConsoleClosed;
         public event EventHandler<EventArgs> ConsoleWindowResized;
         public event EventHandler<EventArgs> ConsoleBufferResized;
+        public event EventHandler<EventArgs> ConnsoleBufferChanged;
 
         private SharedMemory<ConsoleParams> _consoleParams;
         private SharedMemory<CONSOLE_SCREEN_BUFFER_INFO> _consoleScreenInfo;
@@ -348,13 +349,13 @@ namespace ConsoleDotNet
             {
                 CONSOLE_SCREEN_BUFFER_INFO* consoleScreenInfo = (CONSOLE_SCREEN_BUFFER_INFO*)
                     _consoleScreenInfo.Get();
-                CHAR_INFO[,] buffer = new CHAR_INFO[consoleScreenInfo->dwSize.X,
-                    consoleScreenInfo->dwSize.Y];
+                CHAR_INFO[,] buffer = new CHAR_INFO[consoleScreenInfo->srWindow.Height,
+                    consoleScreenInfo->srWindow.Width];
 
                 fixed (CHAR_INFO* dst = buffer)
                 {
-                    WinApi.CopyMemory(new IntPtr(dst), new IntPtr(_consoleBuffer.Get()), buffer.Length
-                        * Marshal.SizeOf(typeof(CHAR_INFO)));
+                    WinApi.CopyMemory(new IntPtr(dst), new IntPtr(_consoleBuffer.Get()), (uint)(buffer.Length
+                        * Marshal.SizeOf(typeof(CHAR_INFO))));
                 }
 
                 return buffer;
@@ -403,6 +404,7 @@ namespace ConsoleDotNet
                     procWaitHandle = new ProcessWaitHandle(_procSafeWaitHandle);
                     waitHandles = new WaitHandle[] { procWaitHandle, _consoleBuffer.RequestEvent };
 
+                    // Loop until console has exitted.
                     while (WaitHandle.WaitAny(waitHandles) > 0)
                     {
                         // Get current window and buffer size.
@@ -419,7 +421,7 @@ namespace ConsoleDotNet
                             consoleParams->Columns = columns;
                             consoleParams->Rows = rows;
 
-                            // Raise event.
+                            // Raise event, window has been resized.
                             if (ConsoleWindowResized != null) ConsoleWindowResized(this, new EventArgs());
                         }
 
@@ -431,9 +433,12 @@ namespace ConsoleDotNet
                             consoleParams->BufferColumns = bufferColumns;
                             consoleParams->BufferRows = bufferRows;
 
-                            // Raise event.
+                            // Raise event, buffer has been resized.
                             if (ConsoleBufferResized != null) ConsoleBufferResized(this, new EventArgs());
                         }
+
+                        // Raise event, buffer has changed.
+                        if (ConnsoleBufferChanged != null) ConnsoleBufferChanged(this, new EventArgs());
                     }
                 }
             }
@@ -467,7 +472,7 @@ namespace ConsoleDotNet
             procAttrs.nLength = Marshal.SizeOf(procAttrs);
             threadAttrs.nLength = Marshal.SizeOf(threadAttrs);
 
-            // Create environment variables.
+            // Set environment variables for new process.
             IntPtr pEnvironment = IntPtr.Zero;
 
             // Start new console process.
@@ -606,7 +611,7 @@ namespace ConsoleDotNet
                 charInfo.UnicodeChar = ' ';
                 for (int i = 0; i < 200 * 200; ++i)
                     WinApi.CopyMemory(new IntPtr(_consoleBuffer.Get(i)), new IntPtr(&charInfo),
-                        sizeof(CHAR_INFO));
+                        (uint)sizeof(CHAR_INFO));
             }
         }
     }

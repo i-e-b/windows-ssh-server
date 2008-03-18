@@ -379,7 +379,7 @@ namespace SshDotNet
             switch (requestName)
             {
                 case "tcpip-forward":
-                    // not implemented
+                    throw new NotImplementedException();
 
                     //if (wantReply) SendMsgRequestSuccess(null);
 
@@ -528,6 +528,7 @@ namespace SshDotNet
             }
             finally
             {
+                // Remove channel from list of open channels.
                 _channels.Remove(channel);
 
                 // Raise event.

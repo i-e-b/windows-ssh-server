@@ -25,7 +25,7 @@ namespace WindowsSshServer
 
         static ServerService()
         {
-            SshTerminalChannel.InjectionDllFileName = Path.Combine(ServerService.GetStartupPath(),
+            SshWinConsoleChannel.InjectionDllFileName = Path.Combine(ServerService.GetStartupPath(),
                 "ConsoleHook.dll");
         }
 
@@ -272,7 +272,7 @@ namespace WindowsSshServer
 
         private void connService_ChannelOpenRequest(object sender, ChannelOpenRequestEventArgs e)
         {
-            var channel = new SshTerminalChannel(e);
+            var channel = new SshWinConsoleChannel(e);
 
             e.Channel = channel;
             // e.FailureReason = SshChannelOpenFailureReason.UnknownChannelType;

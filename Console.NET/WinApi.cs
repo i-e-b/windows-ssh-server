@@ -60,7 +60,7 @@ namespace ConsoleDotNet
         public static extern short VkKeyScan(char ch);
 
         [DllImport("kernel32", SetLastError = true)]
-        public static extern IntPtr CopyMemory(IntPtr dest, IntPtr src, int size);
+        public static extern IntPtr CopyMemory(IntPtr dest, IntPtr src, uint size);
 
         [DllImport("kernel32", SetLastError = true)]
         public static extern IntPtr CreateFileMapping(IntPtr hFile,

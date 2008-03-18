@@ -9,6 +9,7 @@ namespace SshDotNet
 {
     public class SshSessionChannel : SshChannel
     {
+        public event EventHandler<PseudoTerminalRequestedEventArgs> PseudoTerminalRequested;
         public event EventHandler<EventArgs> PseudoTerminalAllocated;
 
         protected string _termEnvVar;                  // TERM environment variable.
@@ -73,24 +74,37 @@ namespace SshDotNet
             {
                 case "pty-req":
                     // Read information about pseudo-terminal.
-                    _termEnvVar = msgReader.ReadString();
-                    _termCharsWidth = msgReader.ReadUInt32();
-                    _termCharsHeight = msgReader.ReadUInt32();
-                    _termPixelsWidth = msgReader.ReadUInt32();
-                    _termPixelsHeight = msgReader.ReadUInt32();
+                    var termEnvVar = msgReader.ReadString();
+                    var termCharsWidth = msgReader.ReadUInt32();
+                    var termCharsHeight = msgReader.ReadUInt32();
+                    var termPixelsWidth = msgReader.ReadUInt32();
+                    var termPixelsHeight = msgReader.ReadUInt32();
+                    var termModes = ReadTerminalModes(msgReader.ReadByteString());
 
-                    // Get list of terminal modes.
-                    ReadTerminalModes(msgReader.ReadByteString());
+                    // Raise event to request pseudo terminal.
+                    var pseudoTerminalRequestedEventArgs = new PseudoTerminalRequestedEventArgs(termEnvVar);
+
+                    OnPseudoTerminalRequested(pseudoTerminalRequestedEventArgs);
+
+                    // Check if request to allocate pseudo terminal failed.
+                    if (!pseudoTerminalRequestedEventArgs.Success) break;
+
+                    _termEnvVar = termEnvVar;
+                    _termCharsWidth = termCharsWidth;
+                    _termCharsHeight = termCharsHeight;
+                    _termPixelsWidth = termPixelsWidth;
+                    _termPixelsHeight = termPixelsHeight;
+                    _termModes = termModes;
 
                     // Add TERM to list of environment variables.
                     _envVars.Add("TERM", _termEnvVar);
 
-                    // Raise event.
+                    // Raise event, pseudo terminal has been allocated.
                     OnPseudoTerminalAllocated(new EventArgs());
 
                     if (wantReply) _connService.SendMsgChannelSuccess(this);
-
                     return;
+
                 case "env":
                     // Read name and value of environment variable.
                     var varName = msgReader.ReadString();
@@ -100,14 +114,12 @@ namespace SshDotNet
                     _envVars.Add(varName, varValue);
 
                     if (wantReply) _connService.SendMsgChannelSuccess(this);
-
                     return;
                 case "shell":
                     // Start default shell.
                     StartShell();
 
                     if (wantReply) _connService.SendMsgChannelSuccess(this);
-
                     return;
                 case "exec":
                     // not implemented
@@ -137,17 +149,20 @@ namespace SshDotNet
             base.Open(connService);
         }
 
+        protected virtual void OnPseudoTerminalRequested(PseudoTerminalRequestedEventArgs e)
+        {
+            if (PseudoTerminalRequested != null) PseudoTerminalRequested(this, e);
+        }
+
         protected virtual void OnPseudoTerminalAllocated(EventArgs e)
         {
             if (PseudoTerminalAllocated != null) PseudoTerminalAllocated(this, e);
         }
 
-        protected void ReadTerminalModes(byte[] encodedModes)
+        protected List<TerminalMode> ReadTerminalModes(byte[] encodedModes)
         {
+            var termModes = new List<TerminalMode>();
             TerminalModeOpCode opCode;
-
-            // Clear current list of terminal modes.
-            _termModes.Clear();
 
             // Read modes from encoded byte stream.
             using (var streamReader = new SshStreamReader(new MemoryStream(encodedModes)))
@@ -160,7 +175,7 @@ namespace SshDotNet
                     if ((byte)opCode >= 1 && (byte)opCode <= 160)
                     {
                         // Add mode to list.
-                        _termModes.Add(new TerminalMode(opCode, streamReader.ReadUInt32()));
+                        termModes.Add(new TerminalMode(opCode, streamReader.ReadUInt32()));
                     }
                     else
                     {
@@ -169,6 +184,29 @@ namespace SshDotNet
                     }
                 }
             }
+
+            return termModes;
+        }
+    }
+
+    public class PseudoTerminalRequestedEventArgs : EventArgs
+    {
+        public PseudoTerminalRequestedEventArgs(string terminalName)
+        {
+            this.TerminalName = terminalName;
+            this.Success = false;
+        }
+
+        public bool Success
+        {
+            get;
+            set;
+        }
+
+        public string TerminalName
+        {
+            get;
+            protected set;
         }
     }
 

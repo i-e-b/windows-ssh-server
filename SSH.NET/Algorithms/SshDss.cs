@@ -30,42 +30,37 @@ namespace SshDotNet.Algorithms
 
         public override void LoadKeyAndCertificatesData(byte[] data)
         {
-            using (var dataStream = new MemoryStream(data))
+            using (var dataReader = new SshStreamReader(new MemoryStream(data)))
             {
-                using (var dataReader = new SshStreamReader(dataStream))
-                {
-                    // Read parameters from stream.
-                    var algParams = new DSAParameters();
+                // Read parameters from stream.
+                var algParams = new DSAParameters();
 
-                    if (dataReader.ReadString() != this.Name) throw new CryptographicException(
-                       "Key and certificates were not created with this algorithm.");
-                    algParams.P = dataReader.ReadMPInt();
-                    algParams.Q = dataReader.ReadMPInt();
-                    algParams.G = dataReader.ReadMPInt();
-                    algParams.Y = dataReader.ReadMPInt();
+                if (dataReader.ReadString() != this.Name) throw new CryptographicException(
+                   "Key and certificates were not created with this algorithm.");
+                algParams.P = dataReader.ReadMPInt();
+                algParams.Q = dataReader.ReadMPInt();
+                algParams.G = dataReader.ReadMPInt();
+                algParams.Y = dataReader.ReadMPInt();
 
-                    // Import parameters for algorithm key.
-                    _algorithm.ImportParameters(algParams);
-                }
+                // Import parameters for algorithm key.
+                _algorithm.ImportParameters(algParams);
             }
         }
 
         public override byte[] CreateKeyAndCertificatesData()
         {
             using (var dataStream = new MemoryStream())
+            using (var dataWriter = new SshStreamWriter(dataStream))
             {
-                using (var dataWriter = new SshStreamWriter(dataStream))
-                {
-                    // Export parameters for algorithm key.
-                    var algParams = _algorithm.ExportParameters(false);
+                // Export parameters for algorithm key.
+                var algParams = _algorithm.ExportParameters(false);
 
-                    // Write data to stream.
-                    dataWriter.Write(this.Name);
-                    dataWriter.WriteMPint(algParams.P);
-                    dataWriter.WriteMPint(algParams.Q);
-                    dataWriter.WriteMPint(algParams.G);
-                    dataWriter.WriteMPint(algParams.Y);
-                }
+                // Write data to stream.
+                dataWriter.Write(this.Name);
+                dataWriter.WriteMPint(algParams.P);
+                dataWriter.WriteMPint(algParams.Q);
+                dataWriter.WriteMPint(algParams.G);
+                dataWriter.WriteMPint(algParams.Y);
 
                 return dataStream.ToArray();
             }
@@ -78,12 +73,7 @@ namespace SshDotNet.Algorithms
 
         public override bool VerifyHash(byte[] hash, byte[] signature)
         {
-            var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
-
-            using (var sha1 = new SHA1CryptoServiceProvider())
-            {
-                return _algorithm.VerifyHash(hash, hashAlgOid, signature);
-            }
+            return _algorithm.VerifyHash(hash, CryptoConfig.MapNameToOID("SHA1"), signature);
         }
 
         public override byte[] SignData(byte[] data)
@@ -93,12 +83,7 @@ namespace SshDotNet.Algorithms
 
         public override byte[] SignHash(byte[] hash)
         {
-            var hashAlgOid = CryptoConfig.MapNameToOID("SHA1");
-
-            using (var sha1 = new SHA1CryptoServiceProvider())
-            {
-                return _algorithm.SignHash(sha1.ComputeHash(hash), hashAlgOid);
-            }
+            return _algorithm.SignHash(hash, CryptoConfig.MapNameToOID("SHA1"));
         }
 
         public override object Clone()

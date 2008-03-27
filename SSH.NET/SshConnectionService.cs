@@ -60,9 +60,8 @@ namespace SshDotNet
 
             // Create memory stream from payload data.
             using (var msgStream = new MemoryStream(payload))
+            using (var msgReader = new SshStreamReader(msgStream))
             {
-                var msgReader = new SshStreamReader(msgStream);
-
                 // Check message ID.
                 SshConnectionMessage messageId = (SshConnectionMessage)msgReader.ReadByte();
 
@@ -137,9 +136,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.GlobalRequest);
                 msgWriter.Write(requestName);
                 msgWriter.Write(wantReply);
@@ -155,9 +153,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.RequestSuccess);
                 if (data != null) msgWriter.Write(data);
 
@@ -171,9 +168,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.RequestFailure);
 
                 _client.SendPacket(msgStream.ToArray());
@@ -186,9 +182,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelOpenConfirmation);
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.Write(channel.ServerChannel);
@@ -209,9 +204,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelOpenFailure);
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.Write((uint)reason);
@@ -228,9 +222,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelEof);
                 msgWriter.Write(channel.ClientChannel);
 
@@ -244,9 +237,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelClose);
                 msgWriter.Write(channel.ClientChannel);
 
@@ -260,9 +252,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelWindowAdjust);
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.Write(bytesToAdd);
@@ -281,9 +272,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelData);
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.WriteByteString(data);
@@ -303,9 +293,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelExtendedData);
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.Write((uint)dataType);
@@ -322,9 +311,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelRequest);
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.Write(requestType);
@@ -341,12 +329,10 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelSuccess);
                 msgWriter.Write(channel.ClientChannel);
-
 
                 _client.SendPacket(msgStream.ToArray());
             }
@@ -358,9 +344,8 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                var msgWriter = new SshStreamWriter(msgStream);
-
                 msgWriter.Write((byte)SshConnectionMessage.ChannelFailure);
                 msgWriter.Write(channel.ClientChannel);
 

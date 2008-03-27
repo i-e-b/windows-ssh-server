@@ -583,23 +583,23 @@ namespace ConsoleDotNet
         private void CreateSharedObjects(int consoleProcessId)
         {
             // Create objects in shared memory.
-            _consoleParams.Create(string.Format("Console2_params_{0}", consoleProcessId), 1,
+            _consoleParams.Create(string.Format("Console_consoleParams_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjRequest);
-            _consoleScreenInfo.Create(string.Format("Console2_consoleInfo_{0}", consoleProcessId), 1,
+            _consoleScreenInfo.Create(string.Format("Console_consoleInfo_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjRequest);
-            _consoleCursorInfo.Create(string.Format("Console2_cursorInfo_{0}", consoleProcessId), 1,
+            _consoleCursorInfo.Create(string.Format("Console_cursorInfo_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjRequest);
-            _consoleBuffer.Create(string.Format("Console2_consoleBuffer_{0}", consoleProcessId), 200 * 200,
+            _consoleBuffer.Create(string.Format("Console_consoleBuffer_{0}", consoleProcessId), 200 * 200,
                 SyncObjectTypes.SyncObjRequest);
-            _consoleCopyInfo.Create(string.Format("Console2_consoleCopyInfo_{0}", consoleProcessId), 1,
+            _consoleCopyInfo.Create(string.Format("Console_consoleCopyInfo_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjBoth);
-            _consolePasteInfo.Create(string.Format("Console2_consolePasteInfo_{0}", consoleProcessId), 1,
+            _consolePasteInfo.Create(string.Format("Console_consolePasteInfo_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjBoth);
-            _consoleMouseEvent.Create(string.Format("Console2_formatMouseEvent_{0}", consoleProcessId), 1,
+            _consoleMouseEvent.Create(string.Format("Console_formatMouseEvent_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjBoth);
-            _consoleNewSizeInfo.Create(string.Format("Console2_newConsoleSize_{0}", consoleProcessId), 1,
+            _consoleNewSizeInfo.Create(string.Format("Console_newConsoleSize_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjRequest);
-            _consoleNewScrollPos.Create(string.Format("Console2_newScrollPos_{0}", consoleProcessId), 1,
+            _consoleNewScrollPos.Create(string.Format("Console_newScrollPos_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjRequest);
 
             // Initialize console buffer.

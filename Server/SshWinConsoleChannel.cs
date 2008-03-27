@@ -19,16 +19,18 @@ namespace WindowsSshServer
             set;
         }
 
-        protected CHAR_INFO[,] _consoleOldBuffer; // Old buffer of console.
-        protected COORD _consoleOldCursorPos;     // Old position of cursor in console.
-        protected int _consoleOldStartIndex;      // Start index of old new data in console.
-        protected int _consoleOldEndIndex;        // End index of old new data in console.
+        //protected CHAR_INFO[,] _consoleOldBuffer;       // Old buffer of all data of console.
+        protected CHAR_INFO[,] _consoleOldScreenBuffer; // Old screen buffer of console.
+        protected SMALL_RECT _consoleOldWindow;         // Old window bounds of console.
+        protected COORD _consoleOldCursorPos;           // Old position of cursor in console.
+        protected int _consoleOldStartIndex;            // Start index of old new data in console.
+        protected int _consoleOldEndIndex;              // End index of old new data in console.
 
-        protected Terminal _terminal;             // Terminal, which translates sent and received data.
-        protected ConsoleHandler _consoleHandler; // Handles Windows console.
-        //protected Thread _monitorTerminalThread;  // Thread to monitor terminal.
+        protected Terminal _terminal;                   // Terminal, which translates sent and received data.
+        protected ConsoleHandler _consoleHandler;       // Handles Windows console.
+        //protected Thread _monitorTerminalThread;        // Thread to monitor terminal.
 
-        private bool _isDisposed = false;         // True if object has been disposed.
+        private bool _isDisposed = false;               // True if object has been disposed.
 
         public SshWinConsoleChannel(ChannelOpenRequestEventArgs requestEventArgs)
             : base(requestEventArgs)
@@ -78,6 +80,12 @@ namespace WindowsSshServer
 
                 _consoleHandler.ConsoleVisible = value;
             }
+        }
+
+        public int BitMode
+        {
+            get;
+            set;
         }
 
         protected override void StartShell()
@@ -169,6 +177,20 @@ namespace WindowsSshServer
 
         protected override void OnPseudoTerminalAllocated(EventArgs e)
         {
+            // Set bit mode.
+            if (_termModes.Exists(mode => mode.OpCode == TerminalModeOpCode.CS7))
+                _terminal.BitMode = TerminalBitMode.Mode7Bit;
+            else if (_termModes.Exists(mode => mode.OpCode == TerminalModeOpCode.CS8))
+                _terminal.BitMode = TerminalBitMode.Mode8Bit;
+
+            //// Create buffer for console data.
+            //unsafe
+            //{
+            //    var screenBufInfo = (CONSOLE_SCREEN_BUFFER_INFO*)_consoleHandler.ConsoleScreenInfo.Get();
+
+            //    _consoleOldBuffer = new CHAR_INFO[screenBufInfo->dwSize.Y, screenBufInfo->dwSize.X];
+            //}
+
             base.OnPseudoTerminalAllocated(e);
         }
 
@@ -239,25 +261,29 @@ namespace WindowsSshServer
         {
             unsafe
             {
-                var buffer = _consoleHandler.GetConsoleBuffer();
-                var bufWidth = buffer.GetLength(1);
-                var bufHeight = buffer.GetLength(0);
+                var screenBuffer = _consoleHandler.GetConsoleBuffer();
+                var screenBufWidth = screenBuffer.GetLength(1);
+                var screenBufHeight = screenBuffer.GetLength(0);
                 var screenBufInfo = (CONSOLE_SCREEN_BUFFER_INFO*)_consoleHandler.ConsoleScreenInfo.Get();
+                var window = screenBufInfo->srWindow;
                 var cursorPos = screenBufInfo->dwCursorPosition;
 
-                cursorPos.Y -= (ushort)screenBufInfo->srWindow.Top;
+                if (window.Left < _consoleOldWindow.Left || window.Top < _consoleOldWindow.Top) return null;
+
+                cursorPos.X -= (ushort)window.Left;
+                cursorPos.Y -= (ushort)window.Top;
 
                 int startIndex = -1;
                 int endIndex = -1;
 
                 // Create empty old buffer if this is first read from terminal.
-                if (_consoleOldBuffer == null)
+                if (_consoleOldScreenBuffer == null)
                 {
-                    _consoleOldBuffer = new CHAR_INFO[buffer.GetLength(0), buffer.GetLength(1)];
+                    _consoleOldScreenBuffer = new CHAR_INFO[screenBuffer.GetLength(0), screenBuffer.GetLength(1)];
 
-                    for (int y = 0; y < bufHeight; y++)
-                        for (int x = 0; x < bufWidth; x++)
-                            _consoleOldBuffer[y, x] = new CHAR_INFO() { AsciiChar = ' ', Attributes = 0 };
+                    for (int y = 0; y < screenBufHeight; y++)
+                        for (int x = 0; x < screenBufWidth; x++)
+                            _consoleOldScreenBuffer[y, x] = new CHAR_INFO() { AsciiChar = ' ', Attributes = 0 };
                 }
 
                 try
@@ -268,17 +294,19 @@ namespace WindowsSshServer
                         // Scan console buffer to find range of chars that are new/changed.
                         CHAR_INFO charInfo;
                         CHAR_INFO oldCharInfo;
-                        int startX = -1;
-                        int startY = -1;
-                        int endX = -1;
-                        int endY = -1;
+                        int startX = -1, startY = -1;
+                        int endX = 0; int endY = 0;
+                        int x, y = 0;
 
-                        for (int y = 0; y < bufHeight; y++)
+                        for (int oldY = window.Top - _consoleOldWindow.Top; oldY < screenBufHeight; oldY++)
                         {
-                            for (int x = 0; x < bufWidth; x++)
+                            x = 0;
+
+                            for (int oldX = window.Left - _consoleOldWindow.Left; oldX < screenBufWidth;
+                                oldX++)
                             {
-                                charInfo = buffer[y, x];
-                                oldCharInfo = _consoleOldBuffer[y, x];
+                                charInfo = screenBuffer[y, x];
+                                oldCharInfo = _consoleOldScreenBuffer[oldY, oldX];
 
                                 // Check if current buffer differs from old buffer at this position.
                                 if (charInfo.AsciiChar != oldCharInfo.AsciiChar)
@@ -295,42 +323,50 @@ namespace WindowsSshServer
                                         endY = y;
                                     }
                                 }
+
+                                x++;
                             }
+
+                            y++;
                         }
 
                         // Check if new data was found.
-                        if (startX != -1 || !cursorPos.Equals(_consoleOldCursorPos))
+                        if (startX != -1 || !window.Equals(_consoleOldWindow) ||
+                            !cursorPos.Equals(_consoleOldCursorPos))
                         {
-                            int cursorIndex = cursorPos.Y * bufWidth + cursorPos.X;
+                            int cursorIndex = cursorPos.Y * screenBufWidth + cursorPos.X;
 
                             if (startX == -1)
                             {
                                 startX = _consoleOldCursorPos.X;
                                 startY = _consoleOldCursorPos.Y;
-                                startIndex = _consoleOldCursorPos.Y * bufWidth + _consoleOldCursorPos.X;
+                                startIndex = _consoleOldCursorPos.Y * screenBufWidth + _consoleOldCursorPos.X;
                                 endIndex = -1;
                             }
                             else
                             {
-                                startIndex = startY * bufWidth + startX;
-                                endIndex = endY * bufWidth + endX;
+                                startIndex = startY * screenBufWidth + startX;
+                                endIndex = endY * screenBufWidth + endX;
                             }
+
+                            startIndex = Math.Min(startIndex, _consoleOldEndIndex + 1);
 
                             // If cursor is beyond end of range, adjust end index.
                             if (cursorIndex - 1 > endIndex) endIndex = cursorIndex - 1;
 
-                            // Write necessary number of backspaces to output stream.
+                            // Write required number of DEL chars to output stream.
                             int numBackspaces = Math.Max(_consoleOldEndIndex - startIndex + 1, 0);
 
                             for (int i = 0; i < numBackspaces; i++)
-                                outputStream.WriteByte(8); // BS
+                                outputStream.WriteByte(127); // DEL
 
+                            //// Erase all chars to right of beginning of new data.
                             //if (numBackspaces > 0)
                             //{
                             //    outputStream.WriteByte(27);
                             //    outputStream.WriteByte((byte)'[');
-                            //    outputStream.WriteByte((byte)numBackspaces.ToString()[0]);
-                            //    outputStream.WriteByte((byte)'P');
+                            //    outputStream.WriteByte((byte)(numBackspaces).ToString()[0]);
+                            //    outputStream.WriteByte((byte)'X');
                             //}
 
                             // Write new data to output stream.
@@ -342,11 +378,11 @@ namespace WindowsSshServer
                             while (charIndex < newCharsCount)
                             {
                                 // Write current ASCII char.
-                                outputStream.WriteByte((byte)buffer[curY, curX].AsciiChar);
+                                outputStream.WriteByte((byte)screenBuffer[curY, curX].AsciiChar);
                                 charIndex++;
 
                                 curX++;
-                                if (curX == bufWidth)
+                                if (curX == screenBufWidth)
                                 {
                                     curX = 0;
                                     curY++;
@@ -365,7 +401,8 @@ namespace WindowsSshServer
                 finally
                 {
                     // Set old console info.
-                    _consoleOldBuffer = buffer;
+                    _consoleOldScreenBuffer = screenBuffer;
+                    _consoleOldWindow = window;
                     _consoleOldCursorPos = cursorPos;
                     _consoleOldStartIndex = startIndex;
                     _consoleOldEndIndex = endIndex;
@@ -402,7 +439,7 @@ namespace WindowsSshServer
             // Send new data on terminal to clinet.
             var newTermData = ReadNewTerminalData();
 
-            SendData(newTermData);
+            if (newTermData != null) SendData(newTermData);
         }
     }
 }

@@ -153,26 +153,23 @@ namespace SshDotNet
                 _bannerMsgSent = true;
             }
 
-            using (var msgStream = new MemoryStream(payload))
+            using (var msgReader = new SshStreamReader(new MemoryStream(payload)))
             {
-                using (var msgReader = new SshStreamReader(msgStream))
-                {
-                    // Check message ID.
-                    SshAuthenticationMessage messageId = (SshAuthenticationMessage)msgReader.ReadByte();
+                // Check message ID.
+                SshAuthenticationMessage messageId = (SshAuthenticationMessage)msgReader.ReadByte();
 
-                    switch (messageId)
-                    {
-                        // User auth messages
-                        case SshAuthenticationMessage.Request:
-                            ProcessMsgUserAuthRequest(msgReader);
-                            break;
-                        case SshAuthenticationMessage.InfoResponse:
-                            ProcessMsgUserInfoResponse(msgReader);
-                            break;
-                        // Unrecognised message
-                        default:
-                            return false;
-                    }
+                switch (messageId)
+                {
+                    // User auth messages
+                    case SshAuthenticationMessage.Request:
+                        ProcessMsgUserAuthRequest(msgReader);
+                        break;
+                    case SshAuthenticationMessage.InfoResponse:
+                        ProcessMsgUserInfoResponse(msgReader);
+                        break;
+                    // Unrecognised message
+                    default:
+                        return false;
                 }
             }
 
@@ -202,11 +199,9 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    msgWriter.Write((byte)SshAuthenticationMessage.Success);
-                }
+                msgWriter.Write((byte)SshAuthenticationMessage.Success);
 
                 _client.SendPacket(msgStream.ToArray());
             }
@@ -218,13 +213,11 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    msgWriter.Write((byte)SshAuthenticationMessage.Failure);
-                    msgWriter.WriteNameList(this.AllowedAuthMethods.GetSshNames());
-                    msgWriter.Write(partialSuccess);
-                }
+                msgWriter.Write((byte)SshAuthenticationMessage.Failure);
+                msgWriter.WriteNameList(this.AllowedAuthMethods.GetSshNames());
+                msgWriter.Write(partialSuccess);
 
                 _client.SendPacket(msgStream.ToArray());
             }
@@ -236,13 +229,11 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    msgWriter.Write((byte)SshAuthenticationMessage.Banner);
-                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(message));
-                    msgWriter.Write(language);
-                }
+                msgWriter.Write((byte)SshAuthenticationMessage.Banner);
+                msgWriter.WriteByteString(Encoding.UTF8.GetBytes(message));
+                msgWriter.Write(language);
 
                 _client.SendPacket(msgStream.ToArray());
             }
@@ -254,15 +245,13 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    msgWriter.Write((byte)SshAuthenticationMessage.PublicKeyOk);
+                msgWriter.Write((byte)SshAuthenticationMessage.PublicKeyOk);
 
-                    // Write public key information.
-                    msgWriter.Write(algName);
-                    msgWriter.WriteByteString(keyBlob);
-                }
+                // Write public key information.
+                msgWriter.Write(algName);
+                msgWriter.WriteByteString(keyBlob);
 
                 _client.SendPacket(msgStream.ToArray());
             }
@@ -274,13 +263,11 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    msgWriter.Write((byte)SshAuthenticationMessage.PasswordChangeRequired);
-                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt));
-                    msgWriter.Write(language);
-                }
+                msgWriter.Write((byte)SshAuthenticationMessage.PasswordChangeRequired);
+                msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt));
+                msgWriter.Write(language);
 
                 _client.SendPacket(msgStream.ToArray());
             }
@@ -292,21 +279,19 @@ namespace SshDotNet
 
             // Create message to send.
             using (var msgStream = new MemoryStream())
+            using (var msgWriter = new SshStreamWriter(msgStream))
             {
-                using (var msgWriter = new SshStreamWriter(msgStream))
-                {
-                    msgWriter.Write((byte)SshAuthenticationMessage.InfoRequest);
-                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(name));
-                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(instruction));
-                    msgWriter.Write(""); // language tag (deprecated)
-                    msgWriter.Write(prompts.Count);
+                msgWriter.Write((byte)SshAuthenticationMessage.InfoRequest);
+                msgWriter.WriteByteString(Encoding.UTF8.GetBytes(name));
+                msgWriter.WriteByteString(Encoding.UTF8.GetBytes(instruction));
+                msgWriter.Write(""); // language tag (deprecated)
+                msgWriter.Write(prompts.Count);
 
-                    // Write info for each prompt.
-                    foreach (var prompt in prompts)
-                    {
-                        msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt.Prompt));
-                        msgWriter.Write(prompt.Echo);
-                    }
+                // Write info for each prompt.
+                foreach (var prompt in prompts)
+                {
+                    msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt.Prompt));
+                    msgWriter.Write(prompt.Echo);
                 }
 
                 _client.SendPacket(msgStream.ToArray());
@@ -740,13 +725,11 @@ namespace SshDotNet
             int payloadCount, byte[] signature)
         {
             using (var hashInputStream = new MemoryStream())
+            using (var hashInputWriter = new SshStreamWriter(hashInputStream))
             {
-                using (var hashInputWriter = new SshStreamWriter(hashInputStream))
-                {
-                    // Write input data.
-                    hashInputWriter.WriteByteString(_client.SessionId);
-                    hashInputWriter.Write(payload, payloadOffset, payloadCount);
-                }
+                // Write input data.
+                hashInputWriter.WriteByteString(_client.SessionId);
+                hashInputWriter.Write(payload, payloadOffset, payloadCount);
 
                 // Verify signature.
                 return alg.VerifyData(hashInputStream.ToArray(), signature);

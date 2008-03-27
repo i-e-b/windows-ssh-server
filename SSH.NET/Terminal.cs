@@ -16,6 +16,12 @@ namespace SshDotNet
             _bitMode = TerminalBitMode.Mode7Bit;
         }
 
+        public TerminalBitMode BitMode
+        {
+            get;
+            set;
+        }
+
         public byte[] EscapeData(byte[] input)
         {
             return EscapeData(from b in input select new KeyData(b, false));

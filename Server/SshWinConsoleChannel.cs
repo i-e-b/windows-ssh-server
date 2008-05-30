@@ -19,16 +19,14 @@ namespace WindowsSshServer
             set;
         }
 
-        //protected CHAR_INFO[,] _consoleOldBuffer;       // Old buffer of all data of console.
-        protected CHAR_INFO[,] _consoleOldScreenBuffer; // Old screen buffer of console.
-        protected SMALL_RECT _consoleOldWindow;         // Old window bounds of console.
-        protected COORD _consoleOldCursorPos;           // Old position of cursor in console.
-        protected int _consoleOldStartIndex;            // Start index of old new data in console.
-        protected int _consoleOldEndIndex;              // End index of old new data in console.
+        //protected SMALL_RECT _consoleOldWindow;         // Old window bounds of console.
+        //protected COORD _consoleOldCursorPos;           // Old position of cursor in console.
+        protected int _consoleOldBufferSize;            // Size of old new data in screen buffer.
+        protected int _consoleOldBufferStartIndex;      // Start index of old new data in screen buffer.
+        protected int _consoleBufferOldEndIndex;        // End index of old new data in screen buffer.
 
         protected Terminal _terminal;                   // Terminal, which translates sent and received data.
         protected ConsoleHandler _consoleHandler;       // Handles Windows console.
-        //protected Thread _monitorTerminalThread;        // Thread to monitor terminal.
 
         private bool _isDisposed = false;               // True if object has been disposed.
 
@@ -52,7 +50,6 @@ namespace WindowsSshServer
                     if (disposing)
                     {
                         // Dispose managed resources.
-                        //if (_monitorTerminalThread != null) _monitorTerminalThread.Abort();
                     }
 
                     // Dispose unmanaged resources.
@@ -127,7 +124,7 @@ namespace WindowsSshServer
                 _consoleHandler_ConsoleWindowResized);
             _consoleHandler.ConsoleBufferResized += new EventHandler<EventArgs>(
                 _consoleHandler_ConsoleBufferResized);
-            _consoleHandler.ConnsoleBufferChanged += new EventHandler<EventArgs>(
+            _consoleHandler.ConsoleBufferChanged += new EventHandler<EventArgs>(
                 _consoleHandler_ConnsoleBufferChanged);
         }
 
@@ -261,137 +258,57 @@ namespace WindowsSshServer
         {
             unsafe
             {
-                var screenBuffer = _consoleHandler.GetConsoleBuffer();
-                var screenBufWidth = screenBuffer.GetLength(1);
-                var screenBufHeight = screenBuffer.GetLength(0);
-                var screenBufInfo = (CONSOLE_SCREEN_BUFFER_INFO*)_consoleHandler.ConsoleScreenInfo.Get();
-                var window = screenBufInfo->srWindow;
-                var cursorPos = screenBufInfo->dwCursorPosition;
-
-                if (window.Left < _consoleOldWindow.Left || window.Top < _consoleOldWindow.Top) return null;
-
-                cursorPos.X -= (ushort)window.Left;
-                cursorPos.Y -= (ushort)window.Top;
-
-                int startIndex = -1;
-                int endIndex = -1;
-
-                // Create empty old buffer if this is first read from terminal.
-                if (_consoleOldScreenBuffer == null)
-                {
-                    _consoleOldScreenBuffer = new CHAR_INFO[screenBuffer.GetLength(0), screenBuffer.GetLength(1)];
-
-                    for (int y = 0; y < screenBufHeight; y++)
-                        for (int x = 0; x < screenBufWidth; x++)
-                            _consoleOldScreenBuffer[y, x] = new CHAR_INFO() { AsciiChar = ' ', Attributes = 0 };
-                }
+                var bufferInfo = (ConsoleBufferInfo*)_consoleHandler.ConsoleBufferInfo.Get();
+                var bufferEndIndex = bufferInfo->BufferStartIndex + bufferInfo->BufferSize;
+                var buffer = _consoleHandler.GetConsoleBuffer();
+                var screenInfo = (CONSOLE_SCREEN_BUFFER_INFO*)_consoleHandler.ConsoleScreenInfo.Get();
+                var window = screenInfo->srWindow;
+                var cursorPos = screenInfo->dwCursorPosition;
+                var cursorIndex = cursorPos.Y * screenInfo->dwSize.X + cursorPos.X;
 
                 try
                 {
                     // Create stream to which to output new terminal data.
                     using (var outputStream = new MemoryStream())
                     {
-                        // Scan console buffer to find range of chars that are new/changed.
-                        CHAR_INFO charInfo;
-                        CHAR_INFO oldCharInfo;
-                        int startX = -1, startY = -1;
-                        int endX = 0; int endY = 0;
-                        int x, y = 0;
+                        // Write required number of backspaces/spaces to output stream.
+                        int numSpaces = bufferInfo->BufferStartIndex -
+                            (_consoleOldBufferStartIndex + _consoleOldBufferSize); // _consoleOldEndIndex;
 
-                        for (int oldY = window.Top - _consoleOldWindow.Top; oldY < screenBufHeight; oldY++)
+                        //for (int i = 0; i > numSpaces; i--)
+                        //    outputStream.WriteByte(127); // DEL char
+
+                        //foreach(var chr in numSpaces.ToString())
+                        //    outputStream.WriteByte((byte)chr);
+
+                        for (int i = 0; i > numSpaces; i--)
                         {
-                            x = 0;
-
-                            for (int oldX = window.Left - _consoleOldWindow.Left; oldX < screenBufWidth;
-                                oldX++)
-                            {
-                                charInfo = screenBuffer[y, x];
-                                oldCharInfo = _consoleOldScreenBuffer[oldY, oldX];
-
-                                // Check if current buffer differs from old buffer at this position.
-                                if (charInfo.AsciiChar != oldCharInfo.AsciiChar)
-                                {
-                                    if (startX == -1)
-                                    {
-                                        startX = x;
-                                        startY = y;
-                                    }
-
-                                    if (charInfo.AsciiChar != ' ')
-                                    {
-                                        endX = x;
-                                        endY = y;
-                                    }
-                                }
-
-                                x++;
-                            }
-
-                            y++;
+                            outputStream.WriteByte(0x08);
+                            outputStream.WriteByte(0x1b); // ESC
+                            outputStream.WriteByte(0x9b); // CSI
+                            outputStream.WriteByte((byte)'K');
                         }
 
-                        // Check if new data was found.
-                        if (startX != -1 || !window.Equals(_consoleOldWindow) ||
-                            !cursorPos.Equals(_consoleOldCursorPos))
+                        for (int i = 0; i < numSpaces; i++)
+                            outputStream.WriteByte(0x20); // Space char
+
+                        // Write all new data to output stream.
+                        var charBuffer = ((from c in buffer select (byte)c.UnicodeChar).ToArray());
+                        outputStream.Write(charBuffer, 0, charBuffer.Length);
+
+                        System.Windows.Forms.MessageBox.Show("\"" + Encoding.ASCII.GetString(charBuffer) +
+                            "\"" + " (" + numSpaces + ", " + +buffer.Length + ")");
+
+                        // Write control seq to move cursor forward/backward.
+                        int cursorOffset = cursorIndex - bufferEndIndex + 1;
+
+                        if (cursorOffset != 0)
                         {
-                            int cursorIndex = cursorPos.Y * screenBufWidth + cursorPos.X;
-
-                            if (startX == -1)
-                            {
-                                startX = _consoleOldCursorPos.X;
-                                startY = _consoleOldCursorPos.Y;
-                                startIndex = _consoleOldCursorPos.Y * screenBufWidth + _consoleOldCursorPos.X;
-                                endIndex = -1;
-                            }
-                            else
-                            {
-                                startIndex = startY * screenBufWidth + startX;
-                                endIndex = endY * screenBufWidth + endX;
-                            }
-
-                            startIndex = Math.Min(startIndex, _consoleOldEndIndex + 1);
-
-                            // If cursor is beyond end of range, adjust end index.
-                            if (cursorIndex - 1 > endIndex) endIndex = cursorIndex - 1;
-
-                            // Write required number of DEL chars to output stream.
-                            int numBackspaces = Math.Max(_consoleOldEndIndex - startIndex + 1, 0);
-
-                            for (int i = 0; i < numBackspaces; i++)
-                                outputStream.WriteByte(127); // DEL
-
-                            //// Erase all chars to right of beginning of new data.
-                            //if (numBackspaces > 0)
-                            //{
-                            //    outputStream.WriteByte(27);
-                            //    outputStream.WriteByte((byte)'[');
-                            //    outputStream.WriteByte((byte)(numBackspaces).ToString()[0]);
-                            //    outputStream.WriteByte((byte)'X');
-                            //}
-
-                            // Write new data to output stream.
-                            int curX = startX;
-                            int curY = startY;
-                            int newCharsCount = endIndex - startIndex + 1;
-                            int charIndex = 0;
-
-                            while (charIndex < newCharsCount)
-                            {
-                                // Write current ASCII char.
-                                outputStream.WriteByte((byte)screenBuffer[curY, curX].AsciiChar);
-                                charIndex++;
-
-                                curX++;
-                                if (curX == screenBufWidth)
-                                {
-                                    curX = 0;
-                                    curY++;
-
-                                    // Write CR LF chars.
-                                    outputStream.WriteByte((byte)'\r');
-                                    outputStream.WriteByte((byte)'\n');
-                                }
-                            }
+                            outputStream.WriteByte(0x1b); // ESC
+                            outputStream.WriteByte(0x9b); // CSI
+                            outputStream.WriteDigits(Math.Abs(cursorOffset));
+                            if (cursorOffset > 0) outputStream.WriteByte((byte)'C');
+                            if (cursorOffset < 0) outputStream.WriteByte((byte)'D');
                         }
 
                         // Escape new data, and then return it.
@@ -400,12 +317,15 @@ namespace WindowsSshServer
                 }
                 finally
                 {
-                    // Set old console info.
-                    _consoleOldScreenBuffer = screenBuffer;
-                    _consoleOldWindow = window;
-                    _consoleOldCursorPos = cursorPos;
-                    _consoleOldStartIndex = startIndex;
-                    _consoleOldEndIndex = endIndex;
+                    //// Set old console info.
+                    //_consoleOldWindow = window;
+                    //_consoleOldCursorPos = cursorPos;
+                    _consoleOldBufferSize = bufferInfo->BufferSize;
+                    _consoleOldBufferStartIndex = bufferInfo->BufferStartIndex;
+                    _consoleBufferOldEndIndex = bufferEndIndex;
+
+                    // Set response event.
+                    _consoleHandler.ConsoleBufferInfo.ResponseEvent.Set();
                 }
             }
         }
@@ -436,9 +356,12 @@ namespace WindowsSshServer
 
         private void _consoleHandler_ConnsoleBufferChanged(object sender, EventArgs e)
         {
-            // Send new data on terminal to clinet.
+            // Read new data from terminal buffer.            
             var newTermData = ReadNewTerminalData();
 
+            if (!_connService.Client.IsConnected) return;
+
+            // Send new data on terminal to clinet.
             if (newTermData != null) SendData(newTermData);
         }
     }

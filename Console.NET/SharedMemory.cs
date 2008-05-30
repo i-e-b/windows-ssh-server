@@ -66,6 +66,11 @@ namespace ConsoleDotNet
             GC.SuppressFinalize(this);
         }
 
+        public int Size
+        {
+            get { return _size; }
+        }
+
         public EventWaitHandle RequestEvent
         {
             get

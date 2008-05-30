@@ -35,6 +35,13 @@ namespace ConsoleDotNet
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    public struct ConsoleBufferInfo
+    {
+        public int BufferStartIndex;
+	    public int BufferSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     public struct ConsoleSizeInfo
     {
         public int Rows;

@@ -42,7 +42,7 @@ namespace WindowsSshServer
                 if (_bitMode == TerminalBitMode.Mode7Bit)
                 {
                     // Check if current byte is start of control sequence.
-                    if (inputByte == 27) // ESC
+                    if (inputByte == 0x1b) // ESC
                     {
                         outputKey = DecodeSequence7Bit(inputStream);
                     }

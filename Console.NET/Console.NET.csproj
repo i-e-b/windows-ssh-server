@@ -55,7 +55,8 @@
     <Compile Include="WinApi.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="ConsoleHook.dll">
+    <Content Include="..\ConsoleHook\bin\Release\ConsoleHook.dll">
+      <Link>ConsoleHook.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

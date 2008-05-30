@@ -34,7 +34,7 @@ namespace WindowsSshServer
             get { return "WindowsSshServer"; }
         }
 
-        protected static string GetAssemblyProductName()
+        protected static string GetProductName()
         {
             return ((AssemblyProductAttribute)(System.Reflection.Assembly.GetExecutingAssembly()
                 .GetCustomAttributes(typeof(AssemblyProductAttribute), false))[0]).Product;
@@ -320,7 +320,7 @@ namespace WindowsSshServer
             // Initialize authentication service.
             var authService = e.Client.AuthenticationService;
 
-            authService.BannerMessage = GetAssemblyProductName() + "\r\n";
+            authService.BannerMessage = GetProductName() + "\r\n";
             authService.AuthenticationMethodRequested += new EventHandler<AuthMethodRequestedEventArgs>(
                 authService_AuthenticationMethodRequested);
             authService.AuthenticateUserPublicKey += new EventHandler<AuthUserPublicKeyEventArgs>(

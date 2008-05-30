@@ -169,9 +169,20 @@ namespace WindowsSshServer
                 // Check that operation used current TCP listener.
                 if (ar.AsyncState != _tcpListener || _tcpListener == null) return;
 
-                // Accept incoming connection attempt.
-                var tcpClient = _tcpListener.EndAcceptTcpClient(ar);
+                TcpClient tcpClient;
 
+                try
+                {
+                    // Accept incoming connection attempt.
+                    tcpClient = _tcpListener.EndAcceptTcpClient(ar);
+                }
+                catch (SocketException exSocket)
+                {
+                    if (exSocket.SocketErrorCode == SocketError.ConnectionReset) return;
+
+                    throw exSocket;
+                }
+                
                 // Begin accepting next incoming connected attempt.
                 _tcpListener.BeginAcceptTcpClient(new AsyncCallback(AcceptTcpClient), _tcpListener);
 
@@ -197,6 +208,8 @@ namespace WindowsSshServer
         private void client_Disconnected(object sender, EventArgs e)
         {
             var client = (SshClient)sender;
+
+            client.Dispose();
 
             // Remove client from list.
             _clients.Remove(client);

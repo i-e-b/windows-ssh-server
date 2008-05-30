@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -31,6 +32,7 @@ namespace SshDotNet
                     if (disposing)
                     {
                         // Dispose managed resources.
+                        InternalStop();
                     }
 
                     // Dispose unmanaged resources.
@@ -64,6 +66,12 @@ namespace SshDotNet
             {
                 // Check message ID.
                 SshConnectionMessage messageId = (SshConnectionMessage)msgReader.ReadByte();
+
+#if DEBUG
+                if (System.Enum.IsDefined(typeof(SshConnectionMessage), messageId))
+                    Debug.WriteLine(string.Format(">>> {0}", System.Enum.GetName(
+                        typeof(SshConnectionMessage), messageId)));
+#endif
 
                 switch (messageId)
                 {
@@ -126,7 +134,7 @@ namespace SshDotNet
         {
             // Dispose each channel.
             foreach (var channel in _channels) channel.Dispose();
-
+            
             base.InternalStop();
         }
 
@@ -143,7 +151,7 @@ namespace SshDotNet
                 msgWriter.Write(wantReply);
                 if (data != null) msgWriter.Write(data);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -158,7 +166,7 @@ namespace SshDotNet
                 msgWriter.Write((byte)SshConnectionMessage.RequestSuccess);
                 if (data != null) msgWriter.Write(data);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -172,7 +180,7 @@ namespace SshDotNet
             {
                 msgWriter.Write((byte)SshConnectionMessage.RequestFailure);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -193,7 +201,7 @@ namespace SshDotNet
                 // Write channel-specific data.
                 channel.WriteChannelOpenConfirmationData();
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -212,7 +220,7 @@ namespace SshDotNet
                 msgWriter.WriteByteString(Encoding.UTF8.GetBytes(description));
                 msgWriter.Write(language);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -227,7 +235,7 @@ namespace SshDotNet
                 msgWriter.Write((byte)SshConnectionMessage.ChannelEof);
                 msgWriter.Write(channel.ClientChannel);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -242,7 +250,7 @@ namespace SshDotNet
                 msgWriter.Write((byte)SshConnectionMessage.ChannelClose);
                 msgWriter.Write(channel.ClientChannel);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -258,7 +266,7 @@ namespace SshDotNet
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.Write(bytesToAdd);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -278,7 +286,7 @@ namespace SshDotNet
                 msgWriter.Write(channel.ClientChannel);
                 msgWriter.WriteByteString(data);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -300,7 +308,7 @@ namespace SshDotNet
                 msgWriter.Write((uint)dataType);
                 msgWriter.WriteByteString(data);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -319,7 +327,7 @@ namespace SshDotNet
                 msgWriter.Write(wantReply);
                 msgWriter.Write(requestData);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -334,7 +342,7 @@ namespace SshDotNet
                 msgWriter.Write((byte)SshConnectionMessage.ChannelSuccess);
                 msgWriter.Write(channel.ClientChannel);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 
@@ -349,7 +357,7 @@ namespace SshDotNet
                 msgWriter.Write((byte)SshConnectionMessage.ChannelFailure);
                 msgWriter.Write(channel.ClientChannel);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshConnectionMessage>(msgStream.ToArray());
             }
         }
 

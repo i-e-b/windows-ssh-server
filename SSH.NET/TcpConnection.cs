@@ -39,6 +39,7 @@ namespace SshDotNet
                 if (disposing)
                 {
                     // Dispose managed resources.
+                    Disconnect(false);
                 }
 
                 // Dispose unmanaged resources.

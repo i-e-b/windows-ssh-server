@@ -56,6 +56,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConsoleHelper.cs" />
+    <Compile Include="IoExtensions.cs" />
     <Compile Include="MainForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -97,7 +98,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="SshConsoleClient.cs" />
-    <Compile Include="Extensions.cs" />
+    <Compile Include="LogExtensions.cs" />
     <Compile Include="ServerService.Designer.cs">
       <DependentUpon>ServerService.cs</DependentUpon>
     </Compile>

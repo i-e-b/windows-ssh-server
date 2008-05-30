@@ -74,7 +74,7 @@ namespace SshDotNet
         protected byte[] _sessionId;                     // Session identifier, which is the first exchange hash.
 
         protected IConnection _connection;               // Connection to client that provides data stream.
-        protected Stream _stream;                        // Connection stream, over which data is transmitted.
+        protected Stream _stream;                        // Connection stream, through which data is transmitted.
         protected MeasureableStream _measuredStream;     // Measures data transmission of connection stream.
         protected SshStreamWriter _streamWriter;         // Writes SSH data to stream.
         protected SshStreamReader _streamReader;         // Reads SSH data from stream.
@@ -319,6 +319,7 @@ namespace SshDotNet
 
             // Create thread on which to receive data from connection.
             _receiveThread = new Thread(new ThreadStart(ReceiveData));
+            _receiveThread.Name = "Connection";
             _receiveThread.Start();
 
             // Notify connection object that connection has been established.
@@ -385,10 +386,14 @@ namespace SshDotNet
                 // Check if connection is already closed.
                 if (_stream == null) return;
 
-                // Stop each service.
-                foreach (var service in _services) service.Stop();
+                if (!remotely)
+                {
+                    // Stop active service.
+                    _activeService.Stop();
+                    //foreach (var service in _services) service.Stop();
+                }
 
-                // Dispose objects for data transmission.
+                // Dispose objects used for data transmission.
                 if (_stream != null)
                 {
                     _stream.Dispose();
@@ -475,6 +480,13 @@ namespace SshDotNet
             }
         }
 
+        internal void SendPacket<T>(byte[] payload)
+        {
+            Debug.WriteLine(string.Format("<<< {0}", System.Enum.GetName(typeof(T), (byte)payload[0])));
+
+            SendPacket(payload);
+        }
+
         internal void SendPacket(byte[] payload)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -548,11 +560,6 @@ namespace SshDotNet
                     }
                 }
 
-                // Write to debug.
-                SshMessage messageId = (SshMessage)(payload[0]);
-
-                Debug.WriteLine(string.Format("<<< {0}", messageId.ToString()));
-
                 // Write MAC (Message Authentication Code), if MAC algorithm has been agreed on.
                 if (_macAlgStoC != null)
                 {
@@ -561,8 +568,11 @@ namespace SshDotNet
                     tempStream.Write(mac, 0, mac.Length);
                 }
 
-                // Write packet to stream.
-                _streamWriter.Write(tempStream.ToArray());
+                lock (_streamLock)
+                {
+                    // Write packet to stream.
+                    _streamWriter.Write(tempStream.ToArray());
+                }
             }
 
             // Increment sequence number of next packet to send.
@@ -583,95 +593,95 @@ namespace SshDotNet
             byte[] compressedPayload;
             byte[] mac;
 
-            lock (_streamLock)
+            //lock (_streamLock)
+            //{
+            try
             {
-                try
+                if (_encAlgCtoS != null)
                 {
-                    if (_encAlgCtoS != null)
+                    // Packet is encrypted. Use crypto stream for reading.
+                    cachedStream = new CachedStream(_stream);
+                    cryptoStream = new CryptoStream(cachedStream, _cryptoTransformCtoS, CryptoStreamMode.Read);
+                }
+                else
+                {
+                    // Packet is unencrypted. Use normal network stream for reading.
+                    cryptoStream = _stream;
+                }
+
+                var cryptoStreamReader = new SshStreamReader(cryptoStream);
+
+                // Read packet length information.
+                packetLength = cryptoStreamReader.ReadUInt32();
+                paddingLength = cryptoStreamReader.ReadByte();
+
+                if (paddingLength < 4)
+                {
+                    // Invalid padding length.
+                    Disconnect(SshDisconnectReason.MacError, string.Format(
+                        "Invalid padding length", _receivePacketSeqNumber));
+                    throw new DisconnectedException();
+                }
+
+                // Read payload data.
+                compressedPayload = new byte[packetLength - 1 - paddingLength];
+
+                cryptoStreamReader.Read(compressedPayload, 0, compressedPayload.Length);
+
+                // Skip bytes of random padding.
+                byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
+
+                // Check if currently using MAC algorithm.
+                if (_macAlgCtoS != null)
+                {
+                    // Read MAC (Message Authentication Code).
+                    // MAC is always unencrypted.
+                    mac = new byte[_macAlgCtoS.DigestLength];
+                    int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
+                    int macBytesLeft = mac.Length - macBytesRead;
+
+                    if (macBytesLeft > 0) _streamReader.Read(mac, macBytesRead, macBytesLeft);
+
+                    if (macBytesRead > 0)
                     {
-                        // Packet is encrypted. Use crypto stream for reading.
-                        cachedStream = new CachedStream(_stream);
-                        cryptoStream = new CryptoStream(cachedStream, _cryptoTransformCtoS, CryptoStreamMode.Read);
+                        // Hack: recreate decryptor with correct IV.
+                        _cryptoTransformCtoS.Dispose();
+                        _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
+                            cachedStream.GetBufferEnd(0, _cryptoTransformCtoS.InputBlockSize));
                     }
-                    else
+
+                    // Verify MAC of received packet.
+                    var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
+                        paddingLength, compressedPayload, padding);
+
+                    if (!mac.ArrayEquals(expectedMac))
                     {
-                        // Packet is unencrypted. Use normal network stream for reading.
-                        cryptoStream = _stream;
-                    }
-
-                    var cryptoStreamReader = new SshStreamReader(cryptoStream);
-
-                    // Read packet length information.
-                    packetLength = cryptoStreamReader.ReadUInt32();
-                    paddingLength = cryptoStreamReader.ReadByte();
-
-                    if (paddingLength < 4)
-                    {
-                        // Invalid padding length.
+                        // Invalid MAC.
                         Disconnect(SshDisconnectReason.MacError, string.Format(
-                            "Invalid padding length", _receivePacketSeqNumber));
+                            "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
                         throw new DisconnectedException();
-                    }
-
-                    // Read payload data.
-                    compressedPayload = new byte[packetLength - 1 - paddingLength];
-
-                    cryptoStreamReader.Read(compressedPayload, 0, compressedPayload.Length);
-
-                    // Skip bytes of random padding.
-                    byte[] padding = cryptoStreamReader.ReadBytes(paddingLength);
-
-                    // Check if currently using MAC algorithm.
-                    if (_macAlgCtoS != null)
-                    {
-                        // Read MAC (Message Authentication Code).
-                        // MAC is always unencrypted.
-                        mac = new byte[_macAlgCtoS.DigestLength];
-                        int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
-                        int macBytesLeft = mac.Length - macBytesRead;
-
-                        if (macBytesLeft > 0) _streamReader.Read(mac, macBytesRead, macBytesLeft);
-
-                        if (macBytesRead > 0)
-                        {
-                            // Hack: recreate decryptor with correct IV.
-                            _cryptoTransformCtoS.Dispose();
-                            _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
-                                cachedStream.GetBufferEnd(0, _cryptoTransformCtoS.InputBlockSize));
-                        }
-
-                        // Verify MAC of received packet.
-                        var expectedMac = ComputeMac(_macAlgCtoS, _receivePacketSeqNumber, packetLength,
-                            paddingLength, compressedPayload, padding);
-
-                        if (!mac.ArrayEquals(expectedMac))
-                        {
-                            // Invalid MAC.
-                            Disconnect(SshDisconnectReason.MacError, string.Format(
-                                "Invalid MAC for packet #{0}", _receivePacketSeqNumber));
-                            throw new DisconnectedException();
-                        }
-                    }
-                    else
-                    {
-                        // Set MAC to empty array.
-                        mac = new byte[0];
                     }
                 }
-                catch (CryptographicException exCrypto)
+                else
                 {
-                    // Check if at end of stream.
-                    if (_stream.ReadByte() == -1)
-                    {
-                        Disconnect(true);
-                        throw new DisconnectedException();
-                    }
-                    else
-                    {
-                        throw exCrypto;
-                    }
+                    // Set MAC to empty array.
+                    mac = new byte[0];
                 }
             }
+            catch (CryptographicException exCrypto)
+            {
+                // Check if at end of stream.
+                if (_stream.ReadByte() == -1)
+                {
+                    Disconnect(true);
+                    throw new DisconnectedException();
+                }
+                else
+                {
+                    throw exCrypto;
+                }
+            }
+            //}
 
             // Check that packet length does not exceed maximum.
             if (4 + packetLength + mac.Length > _maxPacketSize)
@@ -683,9 +693,6 @@ namespace SshDotNet
             // Decompress payload data.
             byte[] payload = (_compAlgCtoS == null ? compressedPayload
                 : _compAlgCtoS.Decompress(compressedPayload));
-
-            // Write to debug.
-            Debug.WriteLine(string.Format(">>> {0}", (SshMessage)payload[0]));
 
             try
             {
@@ -831,7 +838,10 @@ namespace SshDotNet
             // Write chars of line to stream.
             byte[] buffer = Encoding.ASCII.GetBytes(value + "\r\n");
 
-            _streamWriter.Write(buffer);
+            lock (_streamLock)
+            {
+                _streamWriter.Write(buffer);
+            }
         }
 
         protected string ReadLine()
@@ -872,7 +882,7 @@ namespace SshDotNet
                     msgWriter.WriteByteString(_hostKeyAlg.CreateSignatureData(_exchangeHash));
                 }
 
-                SendPacket(msgStream.ToArray());
+                SendPacket<SshMessage>(msgStream.ToArray());
             }
         }
 
@@ -900,7 +910,7 @@ namespace SshDotNet
                     msgWriter.Write(language);
                 }
 
-                SendPacket(msgStream.ToArray());
+                SendPacket<SshMessage>(msgStream.ToArray());
             }
         }
 
@@ -922,7 +932,7 @@ namespace SshDotNet
                     msgWriter.WriteByteString(data);
                 }
 
-                SendPacket(msgStream.ToArray());
+                SendPacket<SshMessage>(msgStream.ToArray());
             }
         }
 
@@ -941,7 +951,7 @@ namespace SshDotNet
                     msgWriter.Write(_receivePacketSeqNumber);
                 }
 
-                SendPacket(msgStream.ToArray());
+                SendPacket<SshMessage>(msgStream.ToArray());
             }
         }
 
@@ -995,7 +1005,7 @@ namespace SshDotNet
                 }
 
                 _serverKexInitPayload = msgStream.ToArray();
-                SendPacket(_serverKexInitPayload);
+                SendPacket<SshMessage>(_serverKexInitPayload);
             }
         }
 
@@ -1011,7 +1021,7 @@ namespace SshDotNet
                     msgWriter.Write((byte)SshMessage.NewKeys);
                 }
 
-                SendPacket(msgStream.ToArray());
+                SendPacket<SshMessage>(msgStream.ToArray());
             }
         }
 
@@ -1028,7 +1038,7 @@ namespace SshDotNet
                     msgWriter.Write(serviceName);
                 }
 
-                SendPacket(msgStream.ToArray());
+                SendPacket<SshMessage>(msgStream.ToArray());
             }
         }
 
@@ -1043,6 +1053,12 @@ namespace SshDotNet
                 {
                     // Check message ID.
                     SshMessage messageId = (SshMessage)msgReader.ReadByte();
+
+#if DEBUG
+                    if (System.Enum.IsDefined(typeof(SshMessage), messageId))
+                        Debug.WriteLine(string.Format(">>> {0}", System.Enum.GetName(
+                            typeof(SshMessage), messageId)));
+#endif
 
                     switch (messageId)
                     {
@@ -1131,7 +1147,6 @@ namespace SshDotNet
             string message = msgReader.ReadString();
             string language = msgReader.ToString();
 
-            // Write to debug.
             Debug.WriteLine("Debug message");
             Debug.WriteLine("Language: {0}", language);
             Debug.WriteLine(message);

@@ -19,11 +19,12 @@ namespace ConsoleDotNet
         public event EventHandler<EventArgs> ConsoleClosed;
         public event EventHandler<EventArgs> ConsoleWindowResized;
         public event EventHandler<EventArgs> ConsoleBufferResized;
-        public event EventHandler<EventArgs> ConnsoleBufferChanged;
+        public event EventHandler<EventArgs> ConsoleBufferChanged;
 
         private SharedMemory<ConsoleParams> _consoleParams;
         private SharedMemory<CONSOLE_SCREEN_BUFFER_INFO> _consoleScreenInfo;
         private SharedMemory<CONSOLE_CURSOR_INFO> _consoleCursorInfo;
+        private SharedMemory<ConsoleBufferInfo> _consoleBufferInfo;
         private SharedMemory<CHAR_INFO> _consoleBuffer;
         private SharedMemory<ConsoleCopyInfo> _consoleCopyInfo;
         private SharedMemory<UIntPtr> _consolePasteInfo;
@@ -33,7 +34,7 @@ namespace ConsoleDotNet
 
         private bool _consoleVisible;               // True if terminal window is currently visible.
 
-        private SafeWaitHandle _procSafeWaitHandle; // Wait handle to detect when process exits.
+        private SafeWaitHandle _procSafeWaitHandle; // Wait handle that detects when process exits.
         private Thread _monitorThread;              // Thread for monitoring events received from console.
 
         // Native information about console process and hook.
@@ -61,6 +62,7 @@ namespace ConsoleDotNet
             _consoleParams = new SharedMemory<ConsoleParams>();
             _consoleScreenInfo = new SharedMemory<CONSOLE_SCREEN_BUFFER_INFO>();
             _consoleCursorInfo = new SharedMemory<CONSOLE_CURSOR_INFO>();
+            _consoleBufferInfo = new SharedMemory<ConsoleBufferInfo>();
             _consoleBuffer = new SharedMemory<CHAR_INFO>();
             _consoleCopyInfo = new SharedMemory<ConsoleCopyInfo>();
             _consolePasteInfo = new SharedMemory<UIntPtr>();
@@ -76,6 +78,12 @@ namespace ConsoleDotNet
             Dispose(false);
         }
 
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         private void Dispose(bool disposing)
         {
             lock (_disposeLock)
@@ -86,9 +94,9 @@ namespace ConsoleDotNet
                     {
                         // Dispose managed resources.
 
-                        // Dispose wait handle.
+                        // Dispose wait handles.
                         if (_procSafeWaitHandle != null) _procSafeWaitHandle.Dispose();
-
+                        
                         // Abort monitor thread.
                         if (_monitorThread != null) _monitorThread.Abort();
 
@@ -106,6 +114,7 @@ namespace ConsoleDotNet
                         if (_consoleParams != null) _consoleParams.Dispose();
                         if (_consoleScreenInfo != null) _consoleScreenInfo.Dispose();
                         if (_consoleCursorInfo != null) _consoleCursorInfo.Dispose();
+                        if (_consoleBufferInfo != null) _consoleBufferInfo.Dispose();
                         if (_consoleBuffer != null) _consoleBuffer.Dispose();
                         if (_consoleCopyInfo != null) _consoleCopyInfo.Dispose();
                         if (_consolePasteInfo != null) _consolePasteInfo.Dispose();
@@ -128,12 +137,6 @@ namespace ConsoleDotNet
             }
         }
 
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
         public SharedMemory<ConsoleParams> ConsoleParameters
         {
             get { return _consoleParams; }
@@ -147,6 +150,11 @@ namespace ConsoleDotNet
         public SharedMemory<CONSOLE_CURSOR_INFO> ConsoleCursorInfo
         {
             get { return _consoleCursorInfo; }
+        }
+
+        public SharedMemory<ConsoleBufferInfo> ConsoleBufferInfo
+        {
+            get { return _consoleBufferInfo; }
         }
 
         public SharedMemory<CHAR_INFO> ConsoleBuffer
@@ -302,6 +310,7 @@ namespace ConsoleDotNet
 
             // Start thread to monitor console.
             _monitorThread = new Thread(new ThreadStart(MonitorThread));
+            _monitorThread.Name = "Console Monitor";
             _monitorThread.Start();
 
             // Resume monitor thread.
@@ -343,22 +352,40 @@ namespace ConsoleDotNet
             }
         }
 
-        public CHAR_INFO[,] GetConsoleBuffer()
+        public ConsoleBufferInfo GetConsoleBufferInfo()
         {
             unsafe
             {
-                CONSOLE_SCREEN_BUFFER_INFO* consoleScreenInfo = (CONSOLE_SCREEN_BUFFER_INFO*)
-                    _consoleScreenInfo.Get();
-                CHAR_INFO[,] buffer = new CHAR_INFO[consoleScreenInfo->srWindow.Height,
-                    consoleScreenInfo->srWindow.Width];
+                return *((ConsoleBufferInfo*)_consoleBufferInfo.Get());
+            }
+        }
+
+        public CHAR_INFO[] GetConsoleBuffer()
+        {
+            unsafe
+            {
+                ConsoleBufferInfo* bufferInfo = (ConsoleBufferInfo*)_consoleBufferInfo.Get();
+                CHAR_INFO[] buffer = new CHAR_INFO[bufferInfo->BufferSize];
 
                 fixed (CHAR_INFO* dst = buffer)
                 {
-                    WinApi.CopyMemory(new IntPtr(dst), new IntPtr(_consoleBuffer.Get()), (uint)(buffer.Length
-                        * Marshal.SizeOf(typeof(CHAR_INFO))));
+                    WinApi.CopyMemory(new IntPtr(dst), new IntPtr(_consoleBuffer.Get()),
+                        (uint)(buffer.Length * Marshal.SizeOf(typeof(CHAR_INFO))));
                 }
 
                 return buffer;
+
+                //CONSOLE_SCREEN_BUFFER_INFO* consoleScreenInfo = (CONSOLE_SCREEN_BUFFER_INFO*)
+                //    _consoleScreenInfo.Get();
+                //CHAR_INFO[] buffer = new CHAR_INFO[_consoleBuffer.Size];
+
+                //fixed (CHAR_INFO* dst = buffer)
+                //{
+                //    WinApi.CopyMemory(new IntPtr(dst), new IntPtr(_consoleBuffer.Get()),
+                //        (uint)(buffer.Length * Marshal.SizeOf(typeof(CHAR_INFO))));
+                //}
+
+                //return buffer;
             }
         }
 
@@ -402,7 +429,7 @@ namespace ConsoleDotNet
 
                     // Keep waiting for new events until process has exitted or thread is aborted.
                     procWaitHandle = new ProcessWaitHandle(_procSafeWaitHandle);
-                    waitHandles = new WaitHandle[] { procWaitHandle, _consoleBuffer.RequestEvent };
+                    waitHandles = new WaitHandle[] { procWaitHandle, _consoleBufferInfo.RequestEvent };
 
                     // Loop until console has exitted.
                     while (WaitHandle.WaitAny(waitHandles) > 0)
@@ -438,7 +465,7 @@ namespace ConsoleDotNet
                         }
 
                         // Raise event, buffer has changed.
-                        if (ConnsoleBufferChanged != null) ConnsoleBufferChanged(this, new EventArgs());
+                        if (ConsoleBufferChanged != null) ConsoleBufferChanged(this, new EventArgs());
                     }
                 }
             }
@@ -448,7 +475,7 @@ namespace ConsoleDotNet
             finally
             {
                 if (procWaitHandle != null) procWaitHandle.Close();
-
+                
                 // Raise event.
                 if (ConsoleClosed != null) ConsoleClosed(this, new EventArgs());
             }
@@ -589,8 +616,10 @@ namespace ConsoleDotNet
                 SyncObjectTypes.SyncObjRequest);
             _consoleCursorInfo.Create(string.Format("Console_cursorInfo_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjRequest);
-            _consoleBuffer.Create(string.Format("Console_consoleBuffer_{0}", consoleProcessId), 200 * 200,
-                SyncObjectTypes.SyncObjRequest);
+            _consoleBufferInfo.Create(string.Format("Console_consoleBufferInfo_{0}", consoleProcessId), 1,
+                SyncObjectTypes.SyncObjBoth);
+            _consoleBuffer.Create(string.Format("Console_consoleBuffer_{0}", consoleProcessId), 0xFFFF,
+                SyncObjectTypes.SyncObjNone);
             _consoleCopyInfo.Create(string.Format("Console_consoleCopyInfo_{0}", consoleProcessId), 1,
                 SyncObjectTypes.SyncObjBoth);
             _consolePasteInfo.Create(string.Format("Console_consolePasteInfo_{0}", consoleProcessId), 1,
@@ -609,7 +638,7 @@ namespace ConsoleDotNet
 
                 charInfo.Attributes = 0;
                 charInfo.UnicodeChar = ' ';
-                for (int i = 0; i < 200 * 200; ++i)
+                for (int i = 0; i < 0xFFFF; ++i)
                     WinApi.CopyMemory(new IntPtr(_consoleBuffer.Get(i)), new IntPtr(&charInfo),
                         (uint)sizeof(CHAR_INFO));
             }

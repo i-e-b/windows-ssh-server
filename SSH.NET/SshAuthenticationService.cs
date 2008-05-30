@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -158,6 +159,12 @@ namespace SshDotNet
                 // Check message ID.
                 SshAuthenticationMessage messageId = (SshAuthenticationMessage)msgReader.ReadByte();
 
+#if DEBUG
+                if (System.Enum.IsDefined(typeof(SshAuthenticationMessage), messageId))
+                    Debug.WriteLine(string.Format(">>> {0}", System.Enum.GetName(
+                        typeof(SshAuthenticationMessage), messageId)));
+#endif
+
                 switch (messageId)
                 {
                     // User auth messages
@@ -203,7 +210,7 @@ namespace SshDotNet
             {
                 msgWriter.Write((byte)SshAuthenticationMessage.Success);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshAuthenticationMessage>(msgStream.ToArray());
             }
         }
 
@@ -219,7 +226,7 @@ namespace SshDotNet
                 msgWriter.WriteNameList(this.AllowedAuthMethods.GetSshNames());
                 msgWriter.Write(partialSuccess);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshAuthenticationMessage>(msgStream.ToArray());
             }
         }
 
@@ -235,7 +242,7 @@ namespace SshDotNet
                 msgWriter.WriteByteString(Encoding.UTF8.GetBytes(message));
                 msgWriter.Write(language);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshAuthenticationMessage>(msgStream.ToArray());
             }
         }
 
@@ -253,7 +260,7 @@ namespace SshDotNet
                 msgWriter.Write(algName);
                 msgWriter.WriteByteString(keyBlob);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshAuthenticationMessage>(msgStream.ToArray());
             }
         }
 
@@ -269,7 +276,7 @@ namespace SshDotNet
                 msgWriter.WriteByteString(Encoding.UTF8.GetBytes(prompt));
                 msgWriter.Write(language);
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshAuthenticationMessage>(msgStream.ToArray());
             }
         }
 
@@ -294,7 +301,7 @@ namespace SshDotNet
                     msgWriter.Write(prompt.Echo);
                 }
 
-                _client.SendPacket(msgStream.ToArray());
+                _client.SendPacket<SshAuthenticationMessage>(msgStream.ToArray());
             }
         }
 

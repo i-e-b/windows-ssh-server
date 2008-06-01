@@ -25,6 +25,11 @@ namespace WindowsSshServer
         public MainForm()
         {
             InitializeComponent();
+
+            // Load form icon from resource.
+            using (var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
+                .GetManifestResourceStream(this.GetType(), "Windows SSH Server.ico"))
+                this.Icon = new Icon(iconStream);
         }
 
         protected List<SshWinConsoleChannel> GetAllTerminalChannels()
@@ -161,7 +166,11 @@ namespace WindowsSshServer
             statusLabel.Text = _service.TcpServer.IsRunning ? "Running" : "Stopped";
             clientCountLabel.Text = string.Format("{0} clients", _service.TcpServer.Clients.Count);
 
-            activeSessionsLabel.Text = GetAllTerminalChannels().Count.ToString();
+            var allTerminalChannels = GetAllTerminalChannels();
+            
+            activeSessionsLabel.Text = allTerminalChannels.Count.ToString();
+            sessionsListBox.DataSource = (from chan in allTerminalChannels select chan.TerminalTitle)
+                .ToArray();
         }
     }
 }

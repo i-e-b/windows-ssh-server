@@ -23,7 +23,7 @@ namespace WindowsSshServer
         //protected COORD _consoleOldCursorPos;           // Old position of cursor in console.
         protected int _consoleOldBufferSize;            // Size of old new data in screen buffer.
         protected int _consoleOldBufferStartIndex;      // Start index of old new data in screen buffer.
-        protected int _consoleBufferOldEndIndex;        // End index of old new data in screen buffer.
+        protected int _consoleOldBufferEndIndex;        // End index of old new data in screen buffer.
 
         protected Terminal _terminal;                   // Terminal, which translates sent and received data.
         protected ConsoleHandler _consoleHandler;       // Handles Windows console.
@@ -61,6 +61,11 @@ namespace WindowsSshServer
             {
                 base.Dispose(disposing);
             }
+        }
+
+        public string TerminalTitle
+        {
+            get { return _consoleHandler.ConsoleTitle; }
         }
 
         public bool TerminalVisible
@@ -272,9 +277,8 @@ namespace WindowsSshServer
                     using (var outputStream = new MemoryStream())
                     {
                         // Write required number of backspaces/spaces to output stream.
-                        int numSpaces = bufferInfo->BufferStartIndex -
-                            (_consoleOldBufferStartIndex + _consoleOldBufferSize); // _consoleOldEndIndex;
-
+                        int numSpaces = bufferInfo->BufferStartIndex - _consoleOldBufferEndIndex;
+                        
                         //for (int i = 0; i > numSpaces; i--)
                         //    outputStream.WriteByte(127); // DEL char
 
@@ -286,30 +290,45 @@ namespace WindowsSshServer
                             outputStream.WriteByte(0x08);
                             outputStream.WriteByte(0x1b); // ESC
                             outputStream.WriteByte(0x9b); // CSI
-                            outputStream.WriteByte((byte)'K');
+                            outputStream.WriteByte((byte)'K'); 
                         }
 
                         for (int i = 0; i < numSpaces; i++)
                             outputStream.WriteByte(0x20); // Space char
 
                         // Write all new data to output stream.
-                        var charBuffer = ((from c in buffer select (byte)c.UnicodeChar).ToArray());
-                        outputStream.Write(charBuffer, 0, charBuffer.Length);
+                        var charBuffer = (from c in buffer select (byte)c.UnicodeChar).ToArray();
+                        int charIndex = bufferInfo->BufferStartIndex;
+                        bool onlySpaces = true;
 
-                        System.Windows.Forms.MessageBox.Show("\"" + Encoding.ASCII.GetString(charBuffer) +
-                            "\"" + " (" + numSpaces + ", " + +buffer.Length + ")");
-
-                        // Write control seq to move cursor forward/backward.
-                        int cursorOffset = cursorIndex - bufferEndIndex + 1;
-
-                        if (cursorOffset != 0)
+                        foreach (var c in buffer)
                         {
-                            outputStream.WriteByte(0x1b); // ESC
-                            outputStream.WriteByte(0x9b); // CSI
-                            outputStream.WriteDigits(Math.Abs(cursorOffset));
-                            if (cursorOffset > 0) outputStream.WriteByte((byte)'C');
-                            if (cursorOffset < 0) outputStream.WriteByte((byte)'D');
+                            if (onlySpaces) onlySpaces = (c.UnicodeChar == ' ');
+                            if (charIndex >= cursorIndex && onlySpaces)
+                            {
+                                bufferEndIndex--;
+                                continue;
+                            }
+                            charIndex++;
+
+                            outputStream.WriteByte((byte)c.UnicodeChar);
                         }
+                        
+                        //var buf = Encoding.ASCII.GetString(charBuffer);
+                        //System.Windows.Forms.MessageBox.Show("\"" + buf + "\"" + " (" + numSpaces +
+                        //    ", " + buffer.Length + ", " + (buf.Length - buf.TrimEnd().Length) + ")");
+
+                        //// Write control seq to move cursor forward/backward.
+                        //int cursorOffset = cursorIndex - bufferEndIndex;
+
+                        //if (cursorOffset != 0)
+                        //{
+                        //    outputStream.WriteByte(0x1b); // ESC
+                        //    outputStream.WriteByte(0x9b); // CSI
+                        //    outputStream.WriteDigits(Math.Abs(cursorOffset));
+                        //    if (cursorOffset > 0) outputStream.WriteByte((byte)'C');
+                        //    if (cursorOffset < 0) outputStream.WriteByte((byte)'D');
+                        //}
 
                         // Escape new data, and then return it.
                         return _terminal.EscapeData(outputStream.ToArray());
@@ -317,12 +336,12 @@ namespace WindowsSshServer
                 }
                 finally
                 {
-                    //// Set old console info.
+                    //// Store old console info.
                     //_consoleOldWindow = window;
                     //_consoleOldCursorPos = cursorPos;
                     _consoleOldBufferSize = bufferInfo->BufferSize;
                     _consoleOldBufferStartIndex = bufferInfo->BufferStartIndex;
-                    _consoleBufferOldEndIndex = bufferEndIndex;
+                    _consoleOldBufferEndIndex = bufferEndIndex;
 
                     // Set response event.
                     _consoleHandler.ConsoleBufferInfo.ResponseEvent.Set();

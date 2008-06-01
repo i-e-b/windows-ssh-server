@@ -40,6 +40,7 @@
             this.activeSessionsLabel = new System.Windows.Forms.Label();
             this.activeSessionsCaptionLabel = new System.Windows.Forms.Label();
             this.showAllTerminalsCheckBox = new System.Windows.Forms.CheckBox();
+            this.sessionsListBox = new System.Windows.Forms.ListBox();
             this.sessionsGroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -104,13 +105,14 @@
             this.sessionsGroupBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
                         | System.Windows.Forms.AnchorStyles.Left)
                         | System.Windows.Forms.AnchorStyles.Right)));
+            this.sessionsGroupBox.Controls.Add(this.sessionsListBox);
             this.sessionsGroupBox.Controls.Add(this.closeAllTerminalsButton);
             this.sessionsGroupBox.Controls.Add(this.activeSessionsLabel);
             this.sessionsGroupBox.Controls.Add(this.activeSessionsCaptionLabel);
             this.sessionsGroupBox.Controls.Add(this.showAllTerminalsCheckBox);
             this.sessionsGroupBox.Location = new System.Drawing.Point(12, 70);
             this.sessionsGroupBox.Name = "sessionsGroupBox";
-            this.sessionsGroupBox.Size = new System.Drawing.Size(440, 122);
+            this.sessionsGroupBox.Size = new System.Drawing.Size(440, 202);
             this.sessionsGroupBox.TabIndex = 5;
             this.sessionsGroupBox.TabStop = false;
             this.sessionsGroupBox.Text = "&Sessions";
@@ -118,10 +120,10 @@
             // closeAllTerminalsButton
             // 
             this.closeAllTerminalsButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.closeAllTerminalsButton.Location = new System.Drawing.Point(334, 19);
+            this.closeAllTerminalsButton.Location = new System.Drawing.Point(334, 32);
             this.closeAllTerminalsButton.Name = "closeAllTerminalsButton";
             this.closeAllTerminalsButton.Size = new System.Drawing.Size(100, 23);
-            this.closeAllTerminalsButton.TabIndex = 2;
+            this.closeAllTerminalsButton.TabIndex = 3;
             this.closeAllTerminalsButton.Text = "&Close All";
             this.closeAllTerminalsButton.UseVisualStyleBackColor = true;
             this.closeAllTerminalsButton.Click += new System.EventHandler(this.closeAllTerminalsButton_Click);
@@ -129,7 +131,7 @@
             // activeSessionsLabel
             // 
             this.activeSessionsLabel.AutoSize = true;
-            this.activeSessionsLabel.Location = new System.Drawing.Point(52, 16);
+            this.activeSessionsLabel.Location = new System.Drawing.Point(49, 16);
             this.activeSessionsLabel.Name = "activeSessionsLabel";
             this.activeSessionsLabel.Size = new System.Drawing.Size(42, 13);
             this.activeSessionsLabel.TabIndex = 1;
@@ -138,7 +140,7 @@
             // activeSessionsCaptionLabel
             // 
             this.activeSessionsCaptionLabel.AutoSize = true;
-            this.activeSessionsCaptionLabel.Location = new System.Drawing.Point(6, 16);
+            this.activeSessionsCaptionLabel.Location = new System.Drawing.Point(3, 16);
             this.activeSessionsCaptionLabel.Name = "activeSessionsCaptionLabel";
             this.activeSessionsCaptionLabel.Size = new System.Drawing.Size(40, 13);
             this.activeSessionsCaptionLabel.TabIndex = 0;
@@ -148,20 +150,32 @@
             // 
             this.showAllTerminalsCheckBox.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.showAllTerminalsCheckBox.Appearance = System.Windows.Forms.Appearance.Button;
-            this.showAllTerminalsCheckBox.Location = new System.Drawing.Point(334, 48);
+            this.showAllTerminalsCheckBox.Location = new System.Drawing.Point(334, 61);
             this.showAllTerminalsCheckBox.Name = "showAllTerminalsCheckBox";
             this.showAllTerminalsCheckBox.Size = new System.Drawing.Size(100, 23);
-            this.showAllTerminalsCheckBox.TabIndex = 3;
+            this.showAllTerminalsCheckBox.TabIndex = 4;
             this.showAllTerminalsCheckBox.Text = "&Show All";
             this.showAllTerminalsCheckBox.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             this.showAllTerminalsCheckBox.UseVisualStyleBackColor = true;
             this.showAllTerminalsCheckBox.CheckedChanged += new System.EventHandler(this.showAllTerminalsCheckBox_CheckedChanged);
             // 
+            // sessionsListBox
+            // 
+            this.sessionsListBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+                        | System.Windows.Forms.AnchorStyles.Left)
+                        | System.Windows.Forms.AnchorStyles.Right)));
+            this.sessionsListBox.FormattingEnabled = true;
+            this.sessionsListBox.IntegralHeight = false;
+            this.sessionsListBox.Location = new System.Drawing.Point(6, 32);
+            this.sessionsListBox.Name = "sessionsListBox";
+            this.sessionsListBox.Size = new System.Drawing.Size(322, 164);
+            this.sessionsListBox.TabIndex = 2;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(464, 204);
+            this.ClientSize = new System.Drawing.Size(464, 284);
             this.Controls.Add(this.sessionsGroupBox);
             this.Controls.Add(this.generateKeysButton);
             this.Controls.Add(this.stopButton);
@@ -192,6 +206,7 @@
         private System.Windows.Forms.Label activeSessionsLabel;
         private System.Windows.Forms.Label activeSessionsCaptionLabel;
         private System.Windows.Forms.Button closeAllTerminalsButton;
+        private System.Windows.Forms.ListBox sessionsListBox;
     }
 }
 

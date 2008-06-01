@@ -16,6 +16,7 @@
     <WarningLevel>4</WarningLevel>
     <SignAssembly>false</SignAssembly>
     <AssemblyOriginatorKeyFile>Server Manager.pfx</AssemblyOriginatorKeyFile>
+    <ApplicationIcon>..\Windows SSH Server.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -103,6 +104,11 @@
     </None>
     <None Include="Server Manager.pfx" />
     <AppDesigner Include="Properties\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="..\Windows SSH Server.ico">
+      <Link>Windows SSH Server.ico</Link>
+    </Resource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

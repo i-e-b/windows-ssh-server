@@ -275,6 +275,11 @@ namespace ConsoleDotNet
             set;
         }
 
+        public bool IsDisposed
+        {
+            get { return _isDisposed; }
+        }
+
         public void Initialize()
         {
             int retValue;
@@ -426,7 +431,8 @@ namespace ConsoleDotNet
                     ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
                     CONSOLE_SCREEN_BUFFER_INFO* consoleScreenInfo = (CONSOLE_SCREEN_BUFFER_INFO*)
                         _consoleScreenInfo.Get();
-
+                    ConsoleBufferInfo* consoleBufferInfo = (ConsoleBufferInfo*)_consoleBufferInfo.Get();
+                    
                     // Keep waiting for new events until process has exitted or thread is aborted.
                     procWaitHandle = new ProcessWaitHandle(_procSafeWaitHandle);
                     waitHandles = new WaitHandle[] { procWaitHandle, _consoleBufferInfo.RequestEvent };
@@ -464,8 +470,11 @@ namespace ConsoleDotNet
                             if (ConsoleBufferResized != null) ConsoleBufferResized(this, new EventArgs());
                         }
 
-                        // Raise event, buffer has changed.
-                        if (ConsoleBufferChanged != null) ConsoleBufferChanged(this, new EventArgs());
+                        if (consoleBufferInfo->BufferSize != 0)
+                        {
+                            // Raise event, buffer data has changed.
+                            if (ConsoleBufferChanged != null) ConsoleBufferChanged(this, new EventArgs());
+                        }
                     }
                 }
             }

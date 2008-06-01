@@ -15,6 +15,7 @@
     <SignAssembly>false</SignAssembly>
     <AssemblyOriginatorKeyFile>Server.pfx</AssemblyOriginatorKeyFile>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\Windows SSH Server.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -98,7 +99,7 @@
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
     <Compile Include="SshConsoleClient.cs" />
-    <Compile Include="LogExtensions.cs" />
+    <Compile Include="LoggingExtensions.cs" />
     <Compile Include="ServerService.Designer.cs">
       <DependentUpon>ServerService.cs</DependentUpon>
     </Compile>
@@ -113,6 +114,9 @@
     <Compile Include="XtermTerminal.cs" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="..\Windows SSH Server.ico">
+      <Link>Windows SSH Server.ico</Link>
+    </EmbeddedResource>
     <Content Include="EventLogMsgs.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

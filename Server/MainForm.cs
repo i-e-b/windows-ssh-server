@@ -125,11 +125,13 @@ namespace WindowsSshServer
 
         private void generateKeysButton_Click(object sender, EventArgs e)
         {
+            // Create directory for keys if it does not already exist.
             if (!Directory.Exists(_keysDir)) Directory.CreateDirectory(_keysDir);
 
+            // Generate new keys for each algorithm and write them to files.
             var dssAlg = new SshDss();
             var rsaAlg = new SshRsa();
-
+            
             using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
                 FileMode.Create, FileAccess.Write))
                 dssAlg.ExportKey(fileStream);
@@ -137,6 +139,9 @@ namespace WindowsSshServer
             using (var fileStream = new FileStream(Path.Combine(_keysDir, @"rsa-default.key"),
                 FileMode.Create, FileAccess.Write))
                 rsaAlg.ExportKey(fileStream);
+
+            MessageBox.Show("Cryptographic keys have been successfully regenerated.",
+                Application.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void closeAllTerminalsButton_Click(object sender, EventArgs e)

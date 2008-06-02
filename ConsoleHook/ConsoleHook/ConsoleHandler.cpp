@@ -335,6 +335,7 @@ void ConsoleHandler::ReadConsoleBuffer()
 	// get index of cursor
 	DWORD	dwCursorIndex = csbiConsole.dwCursorPosition.Y * csbiConsole.dwSize.X + 
 		csbiConsole.dwCursorPosition.X;
+	// TO DO: delete line below and alter code that uses dwCursorIndex accordingly
 	if (dwCursorIndex > 0) dwCursorIndex--;
 
 	// compare current and old buffers to find range of new data
@@ -350,7 +351,7 @@ void ConsoleHandler::ReadConsoleBuffer()
 	DWORD	dwNewDataStartIndex = 0;
 	DWORD	dwNewDataEndIndex = 0;
 	
-	//BOOL	bOnlySpaces = true;
+	BOOL	bOnlySpaces = true;
 
 	for (; dwBufIndex < dwCmpLength && dwOldBufIndex < dwCmpLength;)
 	{
@@ -361,13 +362,14 @@ void ConsoleHandler::ReadConsoleBuffer()
 			{
 				bNewDataFound = true;
 				dwNewDataStartIndex = dwBufIndex;
-				//dwNewDataEndIndex = dwNewDataStartIndex - 1;
+				dwNewDataEndIndex = dwNewDataStartIndex - 1;
 			}
-			
-			//if (bOnlySpaces) bOnlySpaces = (pScreenBuffer[dwBufIndex].Char.UnicodeChar == ' ');
-			//if (dwBufIndex >= dwCursorIndex && onlySpaces) continue;
 
-			dwNewDataEndIndex = dwBufIndex;
+			// skip space chars if they are the only chars (yet encountered) after the cursor position
+			if (bOnlySpaces && dwBufIndex > dwCursorIndex) 
+				bOnlySpaces = (pScreenBuffer[dwBufIndex].Char.UnicodeChar == ' ');
+			if (dwBufIndex <= dwCursorIndex || !bOnlySpaces)
+				dwNewDataEndIndex = dwBufIndex;
 		}
 		
 		// increment indices within current and old buffers
@@ -375,46 +377,31 @@ void ConsoleHandler::ReadConsoleBuffer()
 		dwOldBufIndex++;
 	}
 
-	// check if cursor is beyond end of new data
-	if (dwCursorIndex > dwNewDataEndIndex && dwCursorIndex != m_dwOldCursorIndex && dwCursorIndex > 0)
+	// check if cursor is beyond end of new data.
+	if (dwCursorIndex > 0 && dwCursorIndex > dwNewDataEndIndex && dwCursorIndex != m_dwOldCursorIndex)
 	//if (dwCursorIndex > 0 && dwCursorIndex > m_dwOldCursorIndex && dwCursorIndex > dwNewDataEndIndex)
 	{
-		if (!bNewDataFound) dwNewDataStartIndex = m_dwOldNewDataEndIndex - 1;
-		bNewDataFound = true;
-		dwNewDataEndIndex = dwCursorIndex;
+		// check whether new data is ahead or behind of end of old data.
+		if (dwCursorIndex >= m_dwOldNewDataEndIndex) // might be new data even if buffer has not changed
+		{
+			if (!bNewDataFound) dwNewDataStartIndex = m_dwOldNewDataEndIndex + 1;
+			dwNewDataEndIndex = dwCursorIndex;
 
-		//wformat debug(L"cursor index = %1% (was %2%)");
+			bNewDataFound = true;
+		}
+		else if (bNewDataFound) // can only be new data if buffer has changed
+		{
+			//if (!bNewDataFound) dwNewDataStartIndex = dwCursorIndex + 1;
+			dwNewDataStartIndex = dwCursorIndex + 1;
+			dwNewDataEndIndex = m_dwOldNewDataEndIndex - 1;
+
+			//bNewDataFound = true;
+		}
+
+		//wformat debug(L"cursor index = %1% (was %2%), old data end index = %3%");
 		//MessageBox(NULL, reinterpret_cast<LPCWSTR>((
-		//	debug % dwCursorIndex % m_dwOldCursorIndex % bNewDataFound
+		//	debug % dwCursorIndex % m_dwOldCursorIndex % m_dwOldNewDataEndIndex
 		//	).str().c_str()), L"ConsoleHook", MB_OK);
-
-		wformat debug(L"new data found: from %1% (%6% -> %7%) to %2%, cursor index: %3% (%4%, %5%)");
-		MessageBox(NULL, reinterpret_cast<LPCWSTR>((
-			debug % dwNewDataStartIndex % dwNewDataEndIndex % dwCursorIndex
-			% csbiConsole.dwCursorPosition.X % csbiConsole.dwCursorPosition.Y
-			% m_pOldScreenBuffer[dwNewDataStartIndex].Char.UnicodeChar
-			% pScreenBuffer[dwNewDataStartIndex].Char.UnicodeChar
-			).str().c_str()), L"ConsoleHook", MB_OK);
-	}
-
-	if (bNewDataFound)
-	{
-		//wformat debug(L"new data found: from %1% to %2% (previously ? to %3%)");
-		//MessageBox(NULL, reinterpret_cast<LPCWSTR>(
-		//	(debug % dwNewDataStartIndex % dwNewDataEndIndex % m_dwOldNewDataEndIndex
-		//	).str().c_str()), L"ConsoleHook", MB_OK);
-
-		// store current buffer and info for next read
-		m_nOldReadAreaTop = nReadAreaTop;
-		m_nOldReadAreaBottom = nReadAreaBottom;
-		m_dwOldReadAreaStartIndex = dwReadAreaStartIndex;
-		m_dwOldNewDataEndIndex = dwNewDataEndIndex;
-		m_dwOldCursorIndex = dwCursorIndex;
-		m_dwOldScreenBufferSize = dwScreenBufferSize;
-		m_pOldScreenBuffer = shared_array<CHAR_INFO>(new CHAR_INFO[m_dwOldScreenBufferSize]);
-
-		::CopyMemory(m_pOldScreenBuffer.get(), pScreenBuffer.get(), 
-			m_dwOldScreenBufferSize*sizeof(CHAR_INFO));
 	}
 
 	// check if there is new data or if console info has changed
@@ -431,37 +418,74 @@ void ConsoleHandler::ReadConsoleBuffer()
 
 		if (bNewDataFound)
 		{
-			// write new data to shared memory in chunks.
-			DWORD dwChunkStartIndex = dwNewDataStartIndex;
-			DWORD dwChunkSize;
+			m_consoleBufferInfo->bNewDataFound = true;
+			m_consoleBufferInfo->bCursorPositionChanged = (dwCursorIndex != m_dwOldCursorIndex);
 
-			while (dwChunkStartIndex <= dwNewDataEndIndex)
+			// check if new data is of zero length
+			if (dwNewDataStartIndex - 1 == dwNewDataEndIndex)
 			{
-				// calculate size of current chunk
-				dwChunkSize = min(dwNewDataEndIndex - dwChunkStartIndex + 1, 0xffff);
-
-				// copy current buffer and buffer info to shared memory.
-				::CopyMemory(m_consoleBuffer.Get(), pScreenBuffer.get() + dwChunkStartIndex, 
-					dwChunkSize*sizeof(CHAR_INFO));
-				m_consoleBufferInfo->dwBufferStartIndex = dwChunkStartIndex;
-				m_consoleBufferInfo->dwBufferSize = dwChunkSize;
-
-				// notify Console that new buffer data is available
+				// notify Console that data has just been removed
+				m_consoleBufferInfo->dwBufferStartIndex = dwNewDataStartIndex;
+				m_consoleBufferInfo->dwBufferSize = 0;
 				m_consoleBufferInfo.SetReqEvent();
+			}
+			else
+			{
+				// write new data to shared memory in chunks
+				DWORD dwChunkStartIndex = dwNewDataStartIndex;
+				DWORD dwChunkSize;
 
-				// wait for new buffer data to be read
-				::WaitForSingleObject(m_consoleBufferInfo.GetRespEvent(), INFINITE);
+				while (dwChunkStartIndex <= dwNewDataEndIndex)
+				{
+					// calculate size of current chunk
+					dwChunkSize = min(dwNewDataEndIndex - dwChunkStartIndex + 1, 0xffff);
 
-				// advance start index of next chunk of buffer to copy.
-				dwChunkStartIndex += dwChunkSize;
+					// copy current buffer and buffer info to shared memory
+					::CopyMemory(m_consoleBuffer.Get(), pScreenBuffer.get() + dwChunkStartIndex, 
+						dwChunkSize*sizeof(CHAR_INFO));
+					m_consoleBufferInfo->dwBufferStartIndex = dwChunkStartIndex;
+					m_consoleBufferInfo->dwBufferSize = dwChunkSize;
+
+					// notify Console that new buffer data is available
+					m_consoleBufferInfo.SetReqEvent();
+
+					// wait for new buffer data to be read
+					::WaitForSingleObject(m_consoleBufferInfo.GetRespEvent(), INFINITE);
+
+					// advance start index of next chunk of buffer to copy
+					dwChunkStartIndex += dwChunkSize;
+				}
 			}
 		}
 		else
 		{
-			// notify Console that just console info has changed.
-			m_consoleBufferInfo->dwBufferSize = 0;
+			// notify Console that just console info has changed
+			m_consoleBufferInfo->bNewDataFound = false;
 			m_consoleBufferInfo.SetReqEvent();
 		}
+	}
+
+	if (bNewDataFound)
+	{
+		//wformat debug(L"new data found: from %1% (%6% -> %7%) to %2%, cursor index: %3% (%4%, %5%)");
+		//MessageBox(NULL, reinterpret_cast<LPCWSTR>((
+		//	debug % dwNewDataStartIndex % dwNewDataEndIndex % dwCursorIndex
+		//	% csbiConsole.dwCursorPosition.X % csbiConsole.dwCursorPosition.Y
+		//	% m_pOldScreenBuffer[dwNewDataStartIndex].Char.UnicodeChar
+		//	% pScreenBuffer[dwNewDataStartIndex].Char.UnicodeChar
+		//	).str().c_str()), L"ConsoleHook", MB_OK);
+
+		// store current buffer and info for next read
+		m_nOldReadAreaTop = nReadAreaTop;
+		m_nOldReadAreaBottom = nReadAreaBottom;
+		m_dwOldReadAreaStartIndex = dwReadAreaStartIndex;
+		m_dwOldNewDataEndIndex = dwNewDataEndIndex;
+		m_dwOldCursorIndex = dwCursorIndex;
+		m_dwOldScreenBufferSize = dwScreenBufferSize;
+		m_pOldScreenBuffer = shared_array<CHAR_INFO>(new CHAR_INFO[m_dwOldScreenBufferSize]);
+
+		::CopyMemory(m_pOldScreenBuffer.get(), pScreenBuffer.get(), 
+			m_dwOldScreenBufferSize*sizeof(CHAR_INFO));
 	}
 
 //////////////////////////////////////////////////////////////////////////////

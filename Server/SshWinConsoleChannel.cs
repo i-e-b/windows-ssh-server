@@ -21,9 +21,10 @@ namespace WindowsSshServer
 
         //protected SMALL_RECT _consoleOldWindow;         // Old window bounds of console.
         //protected COORD _consoleOldCursorPos;           // Old position of cursor in console.
-        protected int _consoleOldBufferSize;            // Size of old new data in screen buffer.
-        protected int _consoleOldBufferStartIndex;      // Start index of old new data in screen buffer.
-        protected int _consoleOldBufferEndIndex;        // End index of old new data in screen buffer.
+        protected int _consoleOldBufferSize;            // Old size of new data in screen buffer.
+        protected int _consoleOldBufferStartIndex;      // Old start index of new data in screen buffer.
+        protected int _consoleOldBufferEndIndex;        // Old end index of new data in screen buffer.
+        protected int _consoleOldCursorIndex;           // Old index of cursor in console.
 
         protected Terminal _terminal;                   // Terminal, which translates sent and received data.
         protected ConsoleHandler _consoleHandler;       // Handles Windows console.
@@ -94,14 +95,19 @@ namespace WindowsSshServer
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+            // Initialize console (start process and configure handler).
             _consoleHandler.EnvironmentVars = _envVars;
             _consoleHandler.ConsoleInitialWindowWidth = (int)_termCharsWidth;
             _consoleHandler.ConsoleInitialWindowHeight = (int)_termCharsHeight;
             _consoleHandler.ConsoleInitialBufferWidth = _consoleHandler.ConsoleInitialWindowWidth;
             _consoleHandler.ConsoleInitialBufferHeight = 0x1000;
 
-            // Initialize console (start process and configure handler).
             _consoleHandler.Initialize();
+
+            _consoleOldBufferSize = 0;
+            _consoleOldBufferStartIndex = 0;
+            _consoleOldBufferEndIndex = 0;
+            _consoleOldCursorIndex = 0;
 
             //// Abort current monitor thread, if one exists.
             //if (_monitorTerminalThread != null) _monitorTerminalThread.Abort();
@@ -129,8 +135,11 @@ namespace WindowsSshServer
                 _consoleHandler_ConsoleWindowResized);
             _consoleHandler.ConsoleBufferResized += new EventHandler<EventArgs>(
                 _consoleHandler_ConsoleBufferResized);
+            _consoleHandler.ConsoleNewData += new EventHandler<EventArgs>(_consoleHandler_ConsoleNewData);
             _consoleHandler.ConsoleBufferChanged += new EventHandler<EventArgs>(
                 _consoleHandler_ConnsoleBufferChanged);
+            _consoleHandler.ConsoleCursorPositionChanged += new EventHandler<EventArgs>(
+                _consoleHandler_ConsoleCursorPositionChanged);
         }
 
         protected override void InternalClose()
@@ -144,7 +153,7 @@ namespace WindowsSshServer
         protected override void ProcessData(byte[] data)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-
+            
             // Write unescaped data to console.
             TerminalSendKeys(_terminal.UnescapeData(data));
 
@@ -176,7 +185,7 @@ namespace WindowsSshServer
 
             e.Success = true;
         }
-
+        
         protected override void OnPseudoTerminalAllocated(EventArgs e)
         {
             // Set bit mode.
@@ -189,7 +198,6 @@ namespace WindowsSshServer
             //unsafe
             //{
             //    var screenBufInfo = (CONSOLE_SCREEN_BUFFER_INFO*)_consoleHandler.ConsoleScreenInfo.Get();
-
             //    _consoleOldBuffer = new CHAR_INFO[screenBufInfo->dwSize.Y, screenBufInfo->dwSize.X];
             //}
 
@@ -276,59 +284,47 @@ namespace WindowsSshServer
                     // Create stream to which to output new terminal data.
                     using (var outputStream = new MemoryStream())
                     {
-                        // Write required number of backspaces/spaces to output stream.
-                        int numSpaces = bufferInfo->BufferStartIndex - _consoleOldBufferEndIndex;
-                        
-                        //for (int i = 0; i > numSpaces; i--)
-                        //    outputStream.WriteByte(127); // DEL char
-
-                        //foreach(var chr in numSpaces.ToString())
-                        //    outputStream.WriteByte((byte)chr);
-
-                        for (int i = 0; i > numSpaces; i--)
+                        if (bufferInfo->NewDataFound)
                         {
-                            outputStream.WriteByte(0x08);
-                            outputStream.WriteByte(0x1b); // ESC
-                            outputStream.WriteByte(0x9b); // CSI
-                            outputStream.WriteByte((byte)'K'); 
-                        }
+                            // Write required number of backspaces/spaces to output stream.
+                            int numSpaces = bufferInfo->BufferStartIndex - _consoleOldCursorIndex;
 
-                        for (int i = 0; i < numSpaces; i++)
-                            outputStream.WriteByte(0x20); // Space char
-
-                        // Write all new data to output stream.
-                        var charBuffer = (from c in buffer select (byte)c.UnicodeChar).ToArray();
-                        int charIndex = bufferInfo->BufferStartIndex;
-                        bool onlySpaces = true;
-
-                        foreach (var c in buffer)
-                        {
-                            if (onlySpaces) onlySpaces = (c.UnicodeChar == ' ');
-                            if (charIndex >= cursorIndex && onlySpaces)
+                            for (int i = 0; i > numSpaces; i--)
                             {
-                                bufferEndIndex--;
-                                continue;
+                                outputStream.WriteByte(0x08);
+                                outputStream.WriteByte(0x1b); // ESC
+                                outputStream.WriteByte(0x9b); // CSI
+                                outputStream.WriteByte((byte)'K');
                             }
-                            charIndex++;
 
-                            outputStream.WriteByte((byte)c.UnicodeChar);
+                            for (int i = 0; i < numSpaces; i++)
+                                outputStream.WriteByte(0x20); // Space char
+
+                            // Write all new data to output stream.
+                            var charBuffer = (from c in buffer select (byte)c.UnicodeChar).ToArray();
+
+                            foreach (var c in buffer)
+                            {
+                                outputStream.WriteByte((byte)c.UnicodeChar);
+                            }
+
+                            _consoleOldCursorIndex = bufferEndIndex;
                         }
-                        
-                        //var buf = Encoding.ASCII.GetString(charBuffer);
-                        //System.Windows.Forms.MessageBox.Show("\"" + buf + "\"" + " (" + numSpaces +
-                        //    ", " + buffer.Length + ", " + (buf.Length - buf.TrimEnd().Length) + ")");
 
-                        //// Write control seq to move cursor forward/backward.
-                        //int cursorOffset = cursorIndex - bufferEndIndex;
+                        if (bufferInfo->CursorPositionChanged)
+                        {
+                            // Write control seq to move cursor forward/backward.
+                            int cursorOffset = cursorIndex - _consoleOldCursorIndex;
 
-                        //if (cursorOffset != 0)
-                        //{
-                        //    outputStream.WriteByte(0x1b); // ESC
-                        //    outputStream.WriteByte(0x9b); // CSI
-                        //    outputStream.WriteDigits(Math.Abs(cursorOffset));
-                        //    if (cursorOffset > 0) outputStream.WriteByte((byte)'C');
-                        //    if (cursorOffset < 0) outputStream.WriteByte((byte)'D');
-                        //}
+                            if (cursorOffset != 0)
+                            {
+                                outputStream.WriteByte(0x1b); // ESC
+                                outputStream.WriteByte(0x9b); // CSI
+                                outputStream.WriteDigits(Math.Abs(cursorOffset));
+                                if (cursorOffset > 0) outputStream.WriteByte((byte)'C');
+                                if (cursorOffset < 0) outputStream.WriteByte((byte)'D');
+                            }
+                        }
 
                         // Escape new data, and then return it.
                         return _terminal.EscapeData(outputStream.ToArray());
@@ -342,6 +338,7 @@ namespace WindowsSshServer
                     _consoleOldBufferSize = bufferInfo->BufferSize;
                     _consoleOldBufferStartIndex = bufferInfo->BufferStartIndex;
                     _consoleOldBufferEndIndex = bufferEndIndex;
+                    _consoleOldCursorIndex = cursorIndex;
 
                     // Set response event.
                     _consoleHandler.ConsoleBufferInfo.ResponseEvent.Set();
@@ -365,23 +362,31 @@ namespace WindowsSshServer
 
         private void _consoleHandler_ConsoleWindowResized(object sender, EventArgs e)
         {
-            //
+            // TO DO
         }
 
         private void _consoleHandler_ConsoleBufferResized(object sender, EventArgs e)
         {
-            //
+            // TO DO
         }
 
-        private void _consoleHandler_ConnsoleBufferChanged(object sender, EventArgs e)
+        private void _consoleHandler_ConsoleNewData(object sender, EventArgs e)
         {
             // Read new data from terminal buffer.            
             var newTermData = ReadNewTerminalData();
 
             if (!_connService.Client.IsConnected) return;
 
-            // Send new data on terminal to clinet.
+            // Send new data of terminal to client.
             if (newTermData != null) SendData(newTermData);
+        }
+
+        private void _consoleHandler_ConnsoleBufferChanged(object sender, EventArgs e)
+        {
+        }
+
+        private void _consoleHandler_ConsoleCursorPositionChanged(object sender, EventArgs e)
+        {
         }
     }
 }

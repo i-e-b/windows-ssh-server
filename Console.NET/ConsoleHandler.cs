@@ -19,7 +19,9 @@ namespace ConsoleDotNet
         public event EventHandler<EventArgs> ConsoleClosed;
         public event EventHandler<EventArgs> ConsoleWindowResized;
         public event EventHandler<EventArgs> ConsoleBufferResized;
+        public event EventHandler<EventArgs> ConsoleNewData;
         public event EventHandler<EventArgs> ConsoleBufferChanged;
+        public event EventHandler<EventArgs> ConsoleCursorPositionChanged;
 
         private SharedMemory<ConsoleParams> _consoleParams;
         private SharedMemory<CONSOLE_SCREEN_BUFFER_INFO> _consoleScreenInfo;
@@ -470,10 +472,25 @@ namespace ConsoleDotNet
                             if (ConsoleBufferResized != null) ConsoleBufferResized(this, new EventArgs());
                         }
 
-                        if (consoleBufferInfo->BufferSize != 0)
+                        if (consoleBufferInfo->NewDataFound || consoleBufferInfo->CursorPositionChanged)
                         {
-                            // Raise event, buffer data has changed.
-                            if (ConsoleBufferChanged != null) ConsoleBufferChanged(this, new EventArgs());
+                            // Raise event, console has sent new data.
+                            if (ConsoleNewData != null) ConsoleNewData(this, new EventArgs());
+
+                            // Check if new data was found.
+                            if (consoleBufferInfo->NewDataFound)
+                            {
+                                // Raise event, buffer data has changed.
+                                if (ConsoleBufferChanged != null) ConsoleBufferChanged(this, new EventArgs());
+                            }
+
+                            // Check if cursor posistion has changed.
+                            if (consoleBufferInfo->CursorPositionChanged)
+                            {
+                                // Raise event, cursor position has changed.
+                                if (ConsoleCursorPositionChanged != null) ConsoleCursorPositionChanged(this,
+                                    new EventArgs());
+                            }
                         }
                     }
                 }

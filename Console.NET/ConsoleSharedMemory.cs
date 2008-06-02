@@ -6,6 +6,11 @@ using System.Text;
 
 namespace ConsoleDotNet
 {
+    /*
+     * Note:
+     * C# int type is used in place of C++ DWORD (unsigned long) type to avoid casting uint to int.
+     */
+
     [StructLayout(LayoutKind.Sequential)]
     public struct ConsoleCopyInfo
     {
@@ -34,11 +39,17 @@ namespace ConsoleDotNet
         public int HookThreadId;
     }
 
-    [StructLayout(LayoutKind.Sequential)]
+    [StructLayout(LayoutKind.Explicit)]
     public struct ConsoleBufferInfo
     {
+        [FieldOffset(0)]
+        public bool NewDataFound;
+        [FieldOffset(4)]
+        public bool CursorPositionChanged;
+        [FieldOffset(8)]
         public int BufferStartIndex;
-	    public int BufferSize;
+        [FieldOffset(12)]
+        public int BufferSize;
     }
 
     [StructLayout(LayoutKind.Sequential)]

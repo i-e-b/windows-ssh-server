@@ -93,11 +93,15 @@ struct ConsoleSize
 struct ConsoleBufferInfo
 {
 	ConsoleBufferInfo()
-		: dwBufferStartIndex(0),
-		dwBufferSize(0)
+		: bNewDataFound(false)
+		, bCursorPositionChanged(false)
+		, dwBufferStartIndex(0)
+		, dwBufferSize(0)
 	{
 	}
 
+	BOOL	bNewDataFound;
+	BOOL	bCursorPositionChanged;
 	DWORD	dwBufferStartIndex;
 	DWORD	dwBufferSize;
 };

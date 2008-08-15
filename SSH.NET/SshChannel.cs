@@ -1,18 +1,22 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Text;
 
 namespace SshDotNet
 {
-    public abstract class SshChannel : IDisposable
+    public abstract class SshChannel : IDisposable, INotifyPropertyChanged
     {
         public event EventHandler<EventArgs> Opened;
         public event EventHandler<EventArgs> EofSent;
         public event EventHandler<EventArgs> EofReceived;
         public event EventHandler<EventArgs> Closed;
+        public event EventHandler<EventArgs> WindowAdjust;
         public event EventHandler<DataReceivedEventArgs> DataReceived;
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         protected bool _open;                        // True if channel is currently open.
         protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
@@ -116,6 +120,13 @@ namespace SshDotNet
             get { return _isDisposed; }
         }
 
+        public void Close()
+        {
+            if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
+
+            InternalClose();
+        }
+
         public void SendEof()
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
@@ -127,11 +138,11 @@ namespace SshDotNet
             OnEofSent(new EventArgs());
         }
 
-        public void Close()
+        protected void SendWindowAdjust(uint bytesToAdd)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            InternalClose();
+            _connService.SendMsgChannelWindowAdjust(this, bytesToAdd);
         }
 
         protected void SendData(byte[] data)
@@ -205,11 +216,12 @@ namespace SshDotNet
             if (wantReply) _connService.SendMsgChannelFailure(this);
         }
 
-        protected internal virtual void ProcessWindowAdjust(uint bytesToRead)
+        protected internal virtual void ProcessWindowAdjust(uint bytesToAdd)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            //
+            // Raise event.
+            OnWindowAdjust(new DataReceivedEventArgs());
         }
 
         protected internal virtual void ProcessData(byte[] data)
@@ -256,9 +268,19 @@ namespace SshDotNet
             if (Closed != null) Closed(this, e);
         }
 
+        protected virtual void OnWindowAdjust(EventArgs e)
+        {
+            if (WindowAdjust != null) WindowAdjust(this, e);
+        }
+
         protected virtual void OnDataReceived(DataReceivedEventArgs e)
         {
             if (DataReceived != null) DataReceived(this, e);
+        }
+
+        protected virtual void OnPropertyChanged(PropertyChangedEventArgs e)
+        {
+            if (PropertyChanged != null) PropertyChanged(this, e);
         }
     }
 

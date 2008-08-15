@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
+using System.Collections.ObjectModel;
 using System.Data;
 using System.Drawing;
 using System.IO;
@@ -10,7 +10,6 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
-
 using SshDotNet;
 using SshDotNet.Algorithms;
 
@@ -32,36 +31,23 @@ namespace WindowsSshServer
                 this.Icon = new Icon(iconStream);
         }
 
-        protected List<SshWinConsoleChannel> GetAllTerminalChannels()
-        {
-            var list = new List<SshWinConsoleChannel>();
-
-            // Add each terminal channel to list.
-            foreach (var client in _service.TcpServer.Clients)
-            {
-                foreach (var channel in client.ConnectionService.Channels)
-                {
-                    if (channel is SshWinConsoleChannel)
-                        list.Add((SshWinConsoleChannel)channel);
-                }
-            }
-
-            return list;
-        }
-
         private void MainForm_Load(object sender, EventArgs e)
         {
             // Position form within screen.
             if (Properties.Settings.Default.MainFormLocation != new Point(-1, -1))
                 this.Location = Properties.Settings.Default.MainFormLocation;
 
-            // Create service for server.
+            // Create new OS service for server.
             _service = new ServerService();
 
+            _service.TerminalChannelListChanged += new EventHandler<ChannelListChangedEventArgs>(
+                _service_TerminalChannelListChanged);
             _service.TcpServer.ClientConnected += new EventHandler<ClientEventArgs>(
                 tcpServer_ClientConnected);
             _service.TcpServer.ClientDisconnected += new EventHandler<ClientEventArgs>(
                 tcpServer_ClientDisconnected);
+
+            activeSessionsLabel.Text = _service.AllTerminalChannels.Count.ToString();
 
             // Start server immediately.
             startButton.PerformClick();
@@ -83,6 +69,42 @@ namespace WindowsSshServer
         private void tcpServer_ClientDisconnected(object sender, ClientEventArgs e)
         {
             //
+        }
+
+        private void _service_TerminalChannelListChanged(object sender, ChannelListChangedEventArgs e)
+        {
+            if (this.InvokeRequired)
+            {
+                this.Invoke(new EventHandler<ChannelListChangedEventArgs>(_service_TerminalChannelListChanged),
+                    sender, e);
+                return;
+            }
+
+            var termChannel = e.Channel as SshWinConsoleChannel;
+
+            // Add/remove item from list box depending on change to list.
+            switch (e.Action)
+            {
+                case ChannelListAction.ChannelOpened:
+                    sessionsListBox.Items.Add(termChannel, termChannel.TerminalVisible);
+                    break;
+                case ChannelListAction.ChannelClosed:
+                    sessionsListBox.Items.Remove(termChannel);
+                    break;
+                case ChannelListAction.ChannelUpdated:
+                    OnTerminalChannelUpdated(termChannel);
+                    break;
+            }
+
+            activeSessionsLabel.Text = _service.AllTerminalChannels.Count.ToString();
+        }
+
+        private void OnTerminalChannelUpdated(SshWinConsoleChannel termChannel)
+        {
+            // Get index of item corresponding to updated channel in list box.
+            var itemIndex = sessionsListBox.Items.IndexOf(termChannel);
+
+            sessionsListBox.SetItemChecked(itemIndex, termChannel.TerminalVisible);
         }
 
         private void MainForm_FormClosed(object sender, FormClosedEventArgs e)
@@ -131,7 +153,7 @@ namespace WindowsSshServer
             // Generate new keys for each algorithm and write them to files.
             var dssAlg = new SshDss();
             var rsaAlg = new SshRsa();
-            
+
             using (var fileStream = new FileStream(Path.Combine(_keysDir, @"dss-default.key"),
                 FileMode.Create, FileAccess.Write))
                 dssAlg.ExportKey(fileStream);
@@ -146,36 +168,46 @@ namespace WindowsSshServer
 
         private void closeAllTerminalsButton_Click(object sender, EventArgs e)
         {
-            // Close all terminals.
-            var terminalChannels = GetAllTerminalChannels();
+            if (_service.AllTerminalChannels.Count == 0) return;
 
-            terminalChannels.ForEach(channel => channel.Close());
+            // Confirm action of closing all terminals.
+            switch (MessageBox.Show("Are you sure you want to close all active terminal sessions?",
+                Application.ProductName, MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button1))
+            {
+                case DialogResult.Yes:
+                    // Close all terminals.
+                    foreach (var channel in _service.AllTerminalChannels)
+                        channel.Close();
+
+                    break;
+            }
         }
 
         private void showAllTerminalsCheckBox_CheckedChanged(object sender, EventArgs e)
         {
-            // Show/hide all terminals.
-            var terminalChannels = GetAllTerminalChannels();
+            // Show/hide all terminal windows.
+            foreach (var channel in _service.AllTerminalChannels)
+                channel.TerminalVisible = showAllTerminalsCheckBox.Checked;
+        }
 
-            terminalChannels.ForEach(channel => channel.TerminalVisible
-                = showAllTerminalsCheckBox.Checked);
+        private void sessionsListBox_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            // Get channel corresponding to item checked.
+            var termChannel = sessionsListBox.Items[e.Index] as SshWinConsoleChannel;
+
+            termChannel.TerminalVisible = (e.NewValue == CheckState.Checked);
         }
 
         private void updateStatusTimer_Tick(object sender, EventArgs e)
         {
-            // Enable/disable controls.
+            // Enable/disable controls according to server status.
             startButton.Enabled = !_service.TcpServer.IsRunning;
             stopButton.Enabled = _service.TcpServer.IsRunning;
 
             // Update status text.
             statusLabel.Text = _service.TcpServer.IsRunning ? "Running" : "Stopped";
             clientCountLabel.Text = string.Format("{0} clients", _service.TcpServer.Clients.Count);
-
-            var allTerminalChannels = GetAllTerminalChannels();
-            
-            activeSessionsLabel.Text = allTerminalChannels.Count.ToString();
-            sessionsListBox.DataSource = (from chan in allTerminalChannels select chan.TerminalTitle)
-                .ToArray();
         }
     }
 }

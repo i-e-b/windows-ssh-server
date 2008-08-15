@@ -36,11 +36,11 @@
             this.clientCountLabel = new System.Windows.Forms.Label();
             this.generateKeysButton = new System.Windows.Forms.Button();
             this.sessionsGroupBox = new System.Windows.Forms.GroupBox();
+            this.sessionsListBox = new System.Windows.Forms.CheckedListBox();
             this.closeAllTerminalsButton = new System.Windows.Forms.Button();
             this.activeSessionsLabel = new System.Windows.Forms.Label();
             this.activeSessionsCaptionLabel = new System.Windows.Forms.Label();
             this.showAllTerminalsCheckBox = new System.Windows.Forms.CheckBox();
-            this.sessionsListBox = new System.Windows.Forms.ListBox();
             this.sessionsGroupBox.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -117,6 +117,19 @@
             this.sessionsGroupBox.TabStop = false;
             this.sessionsGroupBox.Text = "&Sessions";
             // 
+            // sessionsListBox
+            // 
+            this.sessionsListBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+                        | System.Windows.Forms.AnchorStyles.Left)
+                        | System.Windows.Forms.AnchorStyles.Right)));
+            this.sessionsListBox.FormattingEnabled = true;
+            this.sessionsListBox.IntegralHeight = false;
+            this.sessionsListBox.Location = new System.Drawing.Point(6, 32);
+            this.sessionsListBox.Name = "sessionsListBox";
+            this.sessionsListBox.Size = new System.Drawing.Size(322, 164);
+            this.sessionsListBox.TabIndex = 2;
+            this.sessionsListBox.ItemCheck += new System.Windows.Forms.ItemCheckEventHandler(this.sessionsListBox_ItemCheck);
+            // 
             // closeAllTerminalsButton
             // 
             this.closeAllTerminalsButton.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
@@ -159,18 +172,6 @@
             this.showAllTerminalsCheckBox.UseVisualStyleBackColor = true;
             this.showAllTerminalsCheckBox.CheckedChanged += new System.EventHandler(this.showAllTerminalsCheckBox_CheckedChanged);
             // 
-            // sessionsListBox
-            // 
-            this.sessionsListBox.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-                        | System.Windows.Forms.AnchorStyles.Left)
-                        | System.Windows.Forms.AnchorStyles.Right)));
-            this.sessionsListBox.FormattingEnabled = true;
-            this.sessionsListBox.IntegralHeight = false;
-            this.sessionsListBox.Location = new System.Drawing.Point(6, 32);
-            this.sessionsListBox.Name = "sessionsListBox";
-            this.sessionsListBox.Size = new System.Drawing.Size(322, 164);
-            this.sessionsListBox.TabIndex = 2;
-            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -206,7 +207,7 @@
         private System.Windows.Forms.Label activeSessionsLabel;
         private System.Windows.Forms.Label activeSessionsCaptionLabel;
         private System.Windows.Forms.Button closeAllTerminalsButton;
-        private System.Windows.Forms.ListBox sessionsListBox;
+        private System.Windows.Forms.CheckedListBox sessionsListBox;
     }
 }
 

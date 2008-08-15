@@ -12,6 +12,7 @@ namespace SshDotNet
         public event EventHandler<ChannelOpenRequestEventArgs> ChannelOpenRequest;
         public event EventHandler<ChannelEventArgs> ChannelOpened;
         public event EventHandler<ChannelEventArgs> ChannelClosed;
+        public event EventHandler<ChannelEventArgs> ChannelUpdated;
 
         protected List<SshChannel> _channels; // List of all currently open channels.
 
@@ -134,7 +135,7 @@ namespace SshDotNet
         {
             // Dispose each channel.
             foreach (var channel in _channels) channel.Dispose();
-            
+
             base.InternalStop();
         }
 
@@ -374,11 +375,9 @@ namespace SshDotNet
                 case "tcpip-forward":
                     throw new NotImplementedException();
 
-                    //if (wantReply) SendMsgRequestSuccess(null);
+                //if (wantReply) SendMsgRequestSuccess(null);
 
-                    //return;
-
-                    break;
+                //return;
                 default:
                     // Unrecognised request type.
                     break;
@@ -431,6 +430,8 @@ namespace SshDotNet
                     {
                         channel.Open(this);
                         _channels.Add(channel);
+
+                        channel.PropertyChanged += new System.ComponentModel.PropertyChangedEventHandler(channel_PropertyChanged);
 
                         // Send confirmation message.
                         SendMsgChannelOpenConfirmation(channel);
@@ -597,6 +598,12 @@ namespace SshDotNet
             var data = msgReader.ReadByteString();
 
             channel.ProcessExtendedData(dataType, data);
+        }
+
+        private void channel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (ChannelUpdated != null)
+                ChannelUpdated(this, new ChannelEventArgs((SshChannel)sender));
         }
     }
 

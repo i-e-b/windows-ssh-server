@@ -389,7 +389,7 @@ namespace SshDotNet
                 if (!remotely)
                 {
                     // Stop active service.
-                    _activeService.Stop();
+                    if (_activeService != null) _activeService.Stop();
                     //foreach (var service in _services) service.Stop();
                 }
 
@@ -1147,10 +1147,9 @@ namespace SshDotNet
             string message = msgReader.ReadString();
             string language = msgReader.ToString();
 
-            Debug.WriteLine("Debug message");
+            Debug.WriteLine("Debug message received.");
             Debug.WriteLine("Language: {0}", language);
             Debug.WriteLine(message);
-            Debug.WriteLine("");
 
             // Debug message has been received.
             OnDebugMessageReceived(new SshDebugMessageReceivedEventArgs(alwaysDisplay, message, language));

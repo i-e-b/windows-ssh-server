@@ -171,7 +171,7 @@ void ConsoleHandler::ReadConsoleBuffer()
 //////////////////////////////////////////////////////////////////////////////
 
 	// calculate coordinates of area to read within console buffer
-	// Read from one window height above end of last read to the current bottom of the window.
+	// read from one window height above end of last read to current bottom of window
 	SHORT	nReadAreaTop	= max(m_nOldReadAreaBottom - coordConsoleSize.Y, 0);
 	SHORT	nReadAreaBottom	= min(csbiConsole.srWindow.Bottom, csbiConsole.dwSize.Y);
 	SHORT	nReadAreaLeft	= 0;
@@ -182,8 +182,8 @@ void ConsoleHandler::ReadConsoleBuffer()
 	DWORD	dwReadAreaStartIndex = nReadAreaTop * csbiConsole.dwSize.X + nReadAreaLeft;
 
 	// do console output buffer reading
-	DWORD					dwScreenBufferSize		= nReadAreaWidth * nReadAreaHeight;
-	DWORD					dwScreenBufferOffset	= 0;
+	DWORD		dwScreenBufferSize		= nReadAreaWidth * nReadAreaHeight;
+	DWORD		dwScreenBufferOffset	= 0;
 
 	shared_array<CHAR_INFO> pScreenBuffer(new CHAR_INFO[dwScreenBufferSize]);
 
@@ -339,8 +339,8 @@ void ConsoleHandler::ReadConsoleBuffer()
 	if (dwCursorIndex > 0) dwCursorIndex--;
 
 	// compare current and old buffers to find range of new data
-	// NOTE:	dwScreenBufferSize		= size of current read buffer
-	//			m_dwOldScreenBufferSize	= size of previous read buffer
+	// NOTE:	dwScreenBufferSize		= size of current read area/buffer in chars
+	//			m_dwOldScreenBufferSize	= size of previous read area/buffer in chars
 
 	DWORD	dwCmpStartIndex = max(dwReadAreaStartIndex, m_dwOldReadAreaStartIndex);
 	DWORD	dwCmpLength = min(dwScreenBufferSize, m_dwOldScreenBufferSize);
@@ -353,7 +353,7 @@ void ConsoleHandler::ReadConsoleBuffer()
 	
 	BOOL	bOnlySpaces = true;
 
-	for (; dwBufIndex < dwCmpLength && dwOldBufIndex < dwCmpLength;)
+	for (; dwBufIndex < dwCmpLength && dwOldBufIndex < dwCmpLength; )
 	{
 		// check if corresponding chars in current and old buffers mismatch
 		if (pScreenBuffer[dwBufIndex].Char.UnicodeChar != m_pOldScreenBuffer[dwOldBufIndex].Char.UnicodeChar)
@@ -421,11 +421,18 @@ void ConsoleHandler::ReadConsoleBuffer()
 			m_consoleBufferInfo->bNewDataFound = true;
 			m_consoleBufferInfo->bCursorPositionChanged = (dwCursorIndex != m_dwOldCursorIndex);
 
+			wformat debug(L"start index of buffer = %1%");
+			MessageBox(NULL, reinterpret_cast<LPCWSTR>((
+				debug % dwCmpStartIndex
+				).str().c_str()), L"ConsoleHook", MB_OK);
+
+			dwNewDataEndIndex -= dwCmpStartIndex; // PARTIALLY FIXES PROBLEMS! Run test to see effects.
+
 			// check if new data is of zero length
 			if (dwNewDataStartIndex - 1 == dwNewDataEndIndex)
 			{
 				// notify Console that data has just been removed
-				m_consoleBufferInfo->dwBufferStartIndex = dwNewDataStartIndex;
+				m_consoleBufferInfo->dwBufferStartIndex = dwCmpStartIndex + dwNewDataStartIndex;
 				m_consoleBufferInfo->dwBufferSize = 0;
 				m_consoleBufferInfo.SetReqEvent();
 			}
@@ -439,11 +446,11 @@ void ConsoleHandler::ReadConsoleBuffer()
 				{
 					// calculate size of current chunk
 					dwChunkSize = min(dwNewDataEndIndex - dwChunkStartIndex + 1, 0xffff);
-
+					
 					// copy current buffer and buffer info to shared memory
 					::CopyMemory(m_consoleBuffer.Get(), pScreenBuffer.get() + dwChunkStartIndex, 
 						dwChunkSize*sizeof(CHAR_INFO));
-					m_consoleBufferInfo->dwBufferStartIndex = dwChunkStartIndex;
+					m_consoleBufferInfo->dwBufferStartIndex = dwCmpStartIndex + dwChunkStartIndex;
 					m_consoleBufferInfo->dwBufferSize = dwChunkSize;
 
 					// notify Console that new buffer data is available
@@ -523,7 +530,6 @@ void ConsoleHandler::ReadConsoleBuffer()
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 }
-
 //////////////////////////////////////////////////////////////////////////////
 
 

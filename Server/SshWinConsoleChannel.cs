@@ -81,7 +81,11 @@ namespace WindowsSshServer
             {
                 if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+                var oldValue = _consoleHandler.ConsoleVisible;
                 _consoleHandler.ConsoleVisible = value;
+
+                if (value != oldValue)
+                    OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("TerminalVisible"));
             }
         }
 
@@ -153,7 +157,7 @@ namespace WindowsSshServer
         protected override void ProcessData(byte[] data)
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
-            
+
             // Write unescaped data to console.
             TerminalSendKeys(_terminal.UnescapeData(data));
 
@@ -185,7 +189,7 @@ namespace WindowsSshServer
 
             e.Success = true;
         }
-        
+
         protected override void OnPseudoTerminalAllocated(EventArgs e)
         {
             // Set bit mode.
@@ -286,6 +290,10 @@ namespace WindowsSshServer
                     {
                         if (bufferInfo->NewDataFound)
                         {
+                            System.Diagnostics.Trace.WriteLine(string.Format(
+                                "buffer start index: {0}, size: {1}",
+                                bufferInfo->BufferStartIndex, bufferInfo->BufferSize));
+
                             // Write required number of backspaces/spaces to output stream.
                             int numSpaces = bufferInfo->BufferStartIndex - _consoleOldCursorIndex;
 
@@ -358,6 +366,11 @@ namespace WindowsSshServer
                 | (keyWasDown ? 1 : 0 << 30)  // 30    previous key state
                 | (transitionState << 31)     // 31    transition state
                 );
+        }
+
+        public override string ToString()
+        {
+            return this.TerminalTitle;
         }
 
         private void _consoleHandler_ConsoleWindowResized(object sender, EventArgs e)

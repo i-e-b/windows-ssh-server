@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -9,7 +10,6 @@ using System.Reflection;
 using System.ServiceProcess;
 using System.Text;
 using System.Threading;
-
 using SshDotNet;
 using SshDotNet.Algorithms;
 
@@ -19,9 +19,13 @@ namespace WindowsSshServer
     {
         //protected delegate void LogClientEventHandler(SshClient client);
 
+        public event EventHandler<ChannelListChangedEventArgs> TerminalChannelListChanged;
+
         internal const string EventLogName = "Windows-Ssh-Server";
         internal const string EventSourceName = "Windows-Ssh-Server";
         internal const string KeysDirectory = @"../../../Keys/"; // Directory from which to load host keys.
+
+        protected List<SshWinConsoleChannel> _allTermChannels; // List of all terminal channels from all clients.
 
         static ServerService()
         {
@@ -62,16 +66,40 @@ namespace WindowsSshServer
             _tcpServer.ClientDisconnected += new EventHandler<ClientEventArgs>(
                 _tcpServer_ClientDisconnected);
 
-            // Note: need to set in code for Pause to be enabled.
+            _allTermChannels = new List<SshWinConsoleChannel>();
+
+            // Note: need to set property in code for Pause to be enabled.
             this.CanPauseAndContinue = true;
 
             this.Disposed += new EventHandler(SshServerService_Disposed);
+        }
+
+        public ReadOnlyCollection<SshWinConsoleChannel> AllTerminalChannels
+        {
+            get { return _allTermChannels.AsReadOnly(); }
         }
 
         public SshTcpServer TcpServer
         {
             get { return _tcpServer; }
         }
+
+        //public List<SshWinConsoleChannel> GetAllTerminalChannels()
+        //{
+        //    var list = new List<SshWinConsoleChannel>();
+
+        //    // Add each terminal channel to list.
+        //    foreach (var client in _service.TcpServer.Clients)
+        //    {
+        //        foreach (var channel in client.ConnectionService.Channels)
+        //        {
+        //            if (channel is SshWinConsoleChannel)
+        //                list.Add((SshWinConsoleChannel)channel);
+        //        }
+        //    }
+
+        //    return list;
+        //}
 
         protected void LogClientAuthEvent(SshClient client, AuthenticationMethod method,
             AuthUserEventArgs authUserEventArgs)
@@ -278,14 +306,41 @@ namespace WindowsSshServer
             // e.FailureReason = SshChannelOpenFailureReason.UnknownChannelType;
         }
 
-        private void connService_ChannelOpened(object sender, EventArgs e)
+        private void connService_ChannelOpened(object sender, ChannelEventArgs e)
         {
-            //
+            // Check if channel is terminal channel.
+            if (e.Channel is SshWinConsoleChannel)
+            {
+                _allTermChannels.Add((SshWinConsoleChannel)e.Channel);
+
+                // Raise event.
+                if (TerminalChannelListChanged != null) TerminalChannelListChanged(this,
+                    new ChannelListChangedEventArgs(e.Channel, ChannelListAction.ChannelOpened));
+            }
         }
 
-        private void connService_ChannelClosed(object sender, EventArgs e)
+        private void connService_ChannelClosed(object sender, ChannelEventArgs e)
         {
-            //
+            // Check if channel is terminal channel.
+            if (e.Channel is SshWinConsoleChannel)
+            {
+                _allTermChannels.Remove((SshWinConsoleChannel)e.Channel);
+
+                // Raise event.
+                if (TerminalChannelListChanged != null) TerminalChannelListChanged(this,
+                    new ChannelListChangedEventArgs(e.Channel, ChannelListAction.ChannelClosed));
+            }
+        }
+
+        private void connService_ChannelUpdated(object sender, ChannelEventArgs e)
+        {
+            // Check if channel is terminal channel.
+            if (e.Channel is SshWinConsoleChannel)
+            {
+                // Raise event.
+                if (TerminalChannelListChanged != null) TerminalChannelListChanged(this,
+                    new ChannelListChangedEventArgs(e.Channel, ChannelListAction.ChannelUpdated));
+            }
         }
 
         private void client_KeyExchangeCompleted(object sender, SshKeyExchangeInitializedEventArgs e)
@@ -343,6 +398,7 @@ namespace WindowsSshServer
                 connService_ChannelOpenRequest);
             connService.ChannelOpened += new EventHandler<ChannelEventArgs>(connService_ChannelOpened);
             connService.ChannelClosed += new EventHandler<ChannelEventArgs>(connService_ChannelClosed);
+            connService.ChannelUpdated += new EventHandler<ChannelEventArgs>(connService_ChannelUpdated);
 
             // Write to event log.
             LogClientEvent(e.Client, "Connected from server.", EventLogEntryType.Information);
@@ -359,5 +415,27 @@ namespace WindowsSshServer
             // Dispose TCP server.
             _tcpServer.Dispose();
         }
+    }
+
+    public class ChannelListChangedEventArgs : ChannelEventArgs
+    {
+        public ChannelListChangedEventArgs(SshChannel channel, ChannelListAction action)
+            : base(channel)
+        {
+            this.Action = action;
+        }
+
+        public ChannelListAction Action
+        {
+            get;
+            protected set;
+        }
+    }
+
+    public enum ChannelListAction
+    {
+        ChannelOpened,
+        ChannelClosed,
+        ChannelUpdated
     }
 }

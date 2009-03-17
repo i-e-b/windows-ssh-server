@@ -6,11 +6,11 @@ using System.Runtime.InteropServices;
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
 [assembly: AssemblyTitle("SSH.NET")]
-[assembly: AssemblyDescription("SSH 2.0 library for .NET 3.5.")]
+[assembly: AssemblyDescription("Secure Shell (SSH) 2.0 library for the .NET Framework 3.5.")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("SSH.NET")]
-[assembly: AssemblyCopyright("Copyright © Alex Regueiro 2008")]
+[assembly: AssemblyCopyright("Copyright © Alex Regueiro 2009")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 

@@ -1,13 +1,12 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using System.Runtime.InteropServices;
-
 using Microsoft.Win32;
 using Microsoft.Win32.SafeHandles;
 
@@ -304,7 +303,7 @@ namespace ConsoleDotNet
 
             // Create wait handle for console process.
             _procSafeWaitHandle = new SafeWaitHandle(_procInfo.hProcess, false);
-
+            
             // Set language of console window.
             unsafe
             {
@@ -527,7 +526,7 @@ namespace ConsoleDotNet
 
             // Set environment variables for new process.
             IntPtr pEnvironment = IntPtr.Zero;
-
+            
             // Start new console process.
             retValue = WinApi.CreateProcess(null, this.CommandLine, ref procAttrs, ref threadAttrs, false,
                 CreationFlags.CREATE_NEW_CONSOLE | CreationFlags.CREATE_SUSPENDED, pEnvironment, null,

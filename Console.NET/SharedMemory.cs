@@ -1,11 +1,10 @@
 ﻿using System;
-using System.ComponentModel;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-
 using Microsoft.Win32.SafeHandles;
 
 namespace ConsoleDotNet
@@ -19,7 +18,7 @@ namespace ConsoleDotNet
         private Mutex _sharedMutex;
         private EventWaitHandle _sharedReqEvent;
         private EventWaitHandle _sharedRespEvent;
-
+        
         private bool _isDisposed = false; // True if object has been disposed.
 
         public SharedMemory(string name, int size, SyncObjectTypes syncObjects, bool create)

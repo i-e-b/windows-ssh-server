@@ -134,7 +134,14 @@ namespace SshDotNet
         protected override void InternalStop()
         {
             // Dispose each channel.
-            foreach (var channel in _channels) channel.Dispose();
+            foreach (var channel in _channels)
+            {
+                channel.Closed -= new EventHandler<EventArgs>(channel_Closed);
+                channel.Dispose();
+
+                // Raise event.
+                if (ChannelClosed != null) ChannelClosed(this, new ChannelEventArgs(channel));
+            }
 
             base.InternalStop();
         }
@@ -411,8 +418,6 @@ namespace SshDotNet
             uint initialWindowSize = msgReader.ReadUInt32();
             uint maxPacketSize = msgReader.ReadUInt32();
 
-            SshChannel channel = null;
-
             // Check channel type.
             switch (channelType)
             {
@@ -423,15 +428,18 @@ namespace SshDotNet
 
                     if (ChannelOpenRequest != null) ChannelOpenRequest(this, channelRequestedEventArgs);
 
-                    channel = channelRequestedEventArgs.Channel;
+                    var channel = channelRequestedEventArgs.Channel;
 
                     // Check if channel was created.
                     if (channel != null)
                     {
+                        channel.Opened += new EventHandler<EventArgs>(channel_Opened);
+                        channel.Closed += new EventHandler<EventArgs>(channel_Closed);
+                        channel.PropertyChanged += new System.ComponentModel.PropertyChangedEventHandler(
+                            channel_PropertyChanged);
                         channel.Open(this);
-                        _channels.Add(channel);
 
-                        channel.PropertyChanged += new System.ComponentModel.PropertyChangedEventHandler(channel_PropertyChanged);
+                        _channels.Add(channel);
 
                         // Send confirmation message.
                         SendMsgChannelOpenConfirmation(channel);
@@ -468,12 +476,6 @@ namespace SshDotNet
                     }
 
                     break;
-            }
-
-            if (channel != null)
-            {
-                // Raise event.
-                if (ChannelOpened != null) ChannelOpened(this, new ChannelEventArgs(channel));
             }
         }
 
@@ -516,18 +518,7 @@ namespace SshDotNet
             try { channel = _channels.SingleOrDefault(item => item.ServerChannel == channelNum); }
             catch (InvalidOperationException) { return; }
 
-            try
-            {
-                channel.Close();
-            }
-            finally
-            {
-                // Remove channel from list of open channels.
-                _channels.Remove(channel);
-
-                // Raise event.
-                if (ChannelClosed != null) ChannelClosed(this, new ChannelEventArgs(channel));
-            }
+            channel.Close();
         }
 
         protected void ProcessMsgChannelRequest(SshStreamReader msgReader)
@@ -598,6 +589,25 @@ namespace SshDotNet
             var data = msgReader.ReadByteString();
 
             channel.ProcessExtendedData(dataType, data);
+        }
+
+        private void channel_Opened(object sender, EventArgs e)
+        {
+            var channel = sender as SshChannel;
+
+            // Raise event.
+            if (ChannelOpened != null) ChannelOpened(this, new ChannelEventArgs(channel));
+        }
+
+        private void channel_Closed(object sender, EventArgs e)
+        {
+            var channel = sender as SshChannel;
+
+            // Remove channel from list of open channels.
+            _channels.Remove(channel);
+
+            // Raise event.
+            if (ChannelClosed != null) ChannelClosed(this, new ChannelEventArgs(channel));
         }
 
         private void channel_PropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)

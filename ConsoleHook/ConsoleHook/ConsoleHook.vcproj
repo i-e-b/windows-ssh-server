@@ -18,8 +18,8 @@
 	<Configurations>
 		<Configuration
 			Name="Debug|Win32"
-			OutputDirectory="..\bin\Debug"
-			IntermediateDirectory="..\obj\ConsoleHook\Debug"
+			OutputDirectory="../bin/$(ConfigurationName)"
+			IntermediateDirectory="../obj/$(ConfigurationName)"
 			ConfigurationType="2"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			CharacterSet="1"
@@ -98,8 +98,8 @@
 		</Configuration>
 		<Configuration
 			Name="Release|Win32"
-			OutputDirectory="..\bin\Release"
-			IntermediateDirectory="..\obj\ConsoleHook\Release"
+			OutputDirectory="../bin/$(ConfigurationName)"
+			IntermediateDirectory="../obj/$(ConfigurationName)"
 			ConfigurationType="2"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
 			UseOfATL="0"
@@ -143,6 +143,7 @@
 				Name="VCLinkerTool"
 				AdditionalDependencies="psapi.lib dbghelp.lib"
 				OutputFile="$(OutDir)/ConsoleHook.dll"
+				Version="1.2.3.4"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="2"
@@ -227,6 +228,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\resource1.h"
+				>
+			</File>
+			<File
 				RelativePath="..\shared\SharedMemNames.h"
 				>
 			</File>
@@ -243,6 +248,10 @@
 				>
 			</File>
 		</Filter>
+		<File
+			RelativePath=".\ConsoleHook.rc"
+			>
+		</File>
 		<File
 			RelativePath=".\ReadMe.txt"
 			>

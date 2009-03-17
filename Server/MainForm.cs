@@ -27,7 +27,7 @@ namespace WindowsSshServer
 
             // Load form icon from resource.
             using (var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
-                .GetManifestResourceStream(this.GetType(), "Windows SSH Server.ico"))
+                .GetManifestResourceStream(this.GetType(), "Main.ico"))
                 this.Icon = new Icon(iconStream);
         }
 
@@ -86,7 +86,7 @@ namespace WindowsSshServer
             switch (e.Action)
             {
                 case ChannelListAction.ChannelOpened:
-                    sessionsListBox.Items.Add(termChannel, termChannel.TerminalVisible);
+                    sessionsListBox.Items.Add(termChannel, false);
                     break;
                 case ChannelListAction.ChannelClosed:
                     sessionsListBox.Items.Remove(termChannel);

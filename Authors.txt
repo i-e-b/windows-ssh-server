@@ -1,0 +1,11 @@
+Version 0.1.0
+-------------
+
+Alex Regueiro <alexreg@gmail.com>
+	Project Lead, Programming
+
+Contributions
+-------------
+
+Alexandre Moore
+	Main icon and logo/brand images

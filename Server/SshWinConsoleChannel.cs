@@ -4,10 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-
-using SshDotNet;
-
 using ConsoleDotNet;
+using SshDotNet;
 
 namespace WindowsSshServer
 {
@@ -26,6 +24,7 @@ namespace WindowsSshServer
         protected int _consoleOldBufferEndIndex;        // Old end index of new data in screen buffer.
         protected int _consoleOldCursorIndex;           // Old index of cursor in console.
 
+        //protected string _terminalTitle;                // Title of terminal instance.
         protected Terminal _terminal;                   // Terminal, which translates sent and received data.
         protected ConsoleHandler _consoleHandler;       // Handles Windows console.
 
@@ -66,7 +65,7 @@ namespace WindowsSshServer
 
         public string TerminalTitle
         {
-            get { return _consoleHandler.ConsoleTitle; }
+            get { return (_consoleHandler == null) ? null : _consoleHandler.ConsoleTitle; }
         }
 
         public bool TerminalVisible
@@ -75,12 +74,14 @@ namespace WindowsSshServer
             {
                 if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+                if (_consoleHandler == null) return false;
                 return _consoleHandler.ConsoleVisible;
             }
             set
             {
                 if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
+                if (_consoleHandler == null) return;
                 var oldValue = _consoleHandler.ConsoleVisible;
                 _consoleHandler.ConsoleVisible = value;
 
@@ -127,12 +128,10 @@ namespace WindowsSshServer
         {
             if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-            base.Open(connService);
-
             // Create console handler.
             _consoleHandler = new ConsoleHandler("powershell");
             _consoleHandler.ConsoleTitle = string.Format("{0} - channel {1}",
-                _connService.Client.Connection.ToString(), this.ServerChannel);
+                connService.Client.Connection.ToString(), this.ServerChannel);
             _consoleHandler.InjectionDllFileName = SshWinConsoleChannel.InjectionDllFileName;
 
             _consoleHandler.ConsoleWindowResized += new EventHandler<EventArgs>(
@@ -144,6 +143,8 @@ namespace WindowsSshServer
                 _consoleHandler_ConnsoleBufferChanged);
             _consoleHandler.ConsoleCursorPositionChanged += new EventHandler<EventArgs>(
                 _consoleHandler_ConsoleCursorPositionChanged);
+
+            base.Open(connService);
         }
 
         protected override void InternalClose()

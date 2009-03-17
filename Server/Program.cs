@@ -16,7 +16,7 @@ namespace WindowsSshServer
             // Check if application is running as service.
             if (Environment.UserName == "SYSTEM" && !Environment.UserInteractive)
             {
-                // Run service.
+                // Run OS service.
                 using (var service = new ServerService())
                 {
                     System.ServiceProcess.ServiceBase.Run(service);

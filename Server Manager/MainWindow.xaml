@@ -1,8 +1,7 @@
 ﻿<Window x:Class="WindowsSshServer.Manager.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Windows SSH Server Manager" Height="480" Width="640" Loaded="Window_Loaded" 
-        Icon="Windows SSH Server.ico">
+    Title="Windows SSH Server Manager" Height="480" Width="640" Loaded="Window_Loaded" Icon="Main.ico">
     <Grid>
         <Button HorizontalAlignment="Right" Name="exitButton" Width="75" Height="23" 
                 VerticalAlignment="Bottom" ForceCursor="False" OverridesDefaultStyle="False" 

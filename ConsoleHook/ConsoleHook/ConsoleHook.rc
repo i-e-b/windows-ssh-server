@@ -7,8 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-//#include "afxres.h"
-#include "windows.h"
+#include "afxres.h"
 
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
@@ -54,8 +53,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 2,0,0,138
- PRODUCTVERSION 2,0,0,138
+ FILEVERSION 0,1,0,0
+ PRODUCTVERSION 0,1,0,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -70,15 +69,11 @@ BEGIN
     BEGIN
         BLOCK "000004b0"
         BEGIN
-            VALUE "Comments", "Tabbed cool console window (THIS IS NOT A SHELL :-)"
-            VALUE "CompanyName", "Ingenuity Unlimited Ltd."
-            VALUE "FileDescription", "Console process hook module"
-            VALUE "FileVersion", "2.00, Build 138 2008.01.11"
-            VALUE "InternalName", "Console"
-            VALUE "LegalCopyright", "Copyright © 2001-2008 Marko Bozikovic"
-            VALUE "LegalTrademarks", "Copyright © 2001-2008 Marko Bozikovic"
-            VALUE "OriginalFilename", "Console.exe"
-            VALUE "ProductName", "Console"
+            VALUE "FileDescription", "Hook module for Win32 Console processes"
+            VALUE "FileVersion", "0.1.0"
+            VALUE "InternalName", "ConsoleHook"
+            VALUE "LegalCopyright", "Copyright © 2009 Alex Regueiro (Original Version Copyright © 2001-2008 Marko Bozikovic)"
+            VALUE "ProductName", "Console.NET"
             VALUE "ProductVersion", "2.00.00.138"
         END
     END

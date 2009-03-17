@@ -212,7 +212,7 @@ void ConsoleHandler::ReadConsoleBuffer()
 	TRACE(L"-------------------------------------------------------------------\n");
 */
 
-	// read rows 'chunks'
+	// read rows in chunks
 	SHORT i = 0;
 	SHORT nChunks = max(nReadAreaHeight / coordBufferSize.Y, 1);
 
@@ -315,7 +315,6 @@ void ConsoleHandler::ReadConsoleBuffer()
 		coordStart, 
 		&srBuffer);
 
-
 //	TRACE(L"===================================================================\n");
 	
 	// initialize old screen buffer if this is first read
@@ -350,10 +349,10 @@ void ConsoleHandler::ReadConsoleBuffer()
 	BOOL	bNewDataFound = false;
 	DWORD	dwNewDataStartIndex = 0;
 	DWORD	dwNewDataEndIndex = 0;
-	
+
 	BOOL	bOnlySpaces = true;
 
-	for (; dwBufIndex < dwCmpLength && dwOldBufIndex < dwCmpLength; )
+	for (; dwBufIndex < dwCmpLength && dwOldBufIndex < dwCmpLength;)
 	{
 		// check if corresponding chars in current and old buffers mismatch
 		if (pScreenBuffer[dwBufIndex].Char.UnicodeChar != m_pOldScreenBuffer[dwOldBufIndex].Char.UnicodeChar)
@@ -368,13 +367,29 @@ void ConsoleHandler::ReadConsoleBuffer()
 			// skip space chars if they are the only chars (yet encountered) after the cursor position
 			if (bOnlySpaces && dwBufIndex > dwCursorIndex) 
 				bOnlySpaces = (pScreenBuffer[dwBufIndex].Char.UnicodeChar == ' ');
-			if (dwBufIndex <= dwCursorIndex || !bOnlySpaces)
+			if (!bOnlySpaces || dwBufIndex <= dwCursorIndex)
 				dwNewDataEndIndex = dwBufIndex;
 		}
 		
 		// increment indices within current and old buffers
 		dwBufIndex++;
 		dwOldBufIndex++;
+	}
+
+	if (csbiConsole.srWindow.Top > 0)
+	{
+		wformat debug(L"A. search from %1% to %2% (current) and %3% to %2% (old)");
+		MessageBox(NULL, reinterpret_cast<LPCWSTR>((
+			debug % (dwCmpStartIndex - dwReadAreaStartIndex) % dwCmpLength % (dwCmpStartIndex - m_dwOldReadAreaStartIndex)
+			).str().c_str()), L"ConsoleHook", MB_OK);
+
+		//wformat debug(L"new data found: from %1% (%6% -> %7%) to %2%, cursor index: %3% (%4%, %5%)");
+		//MessageBox(NULL, reinterpret_cast<LPCWSTR>((
+		//	debug % dwNewDataStartIndex % dwNewDataEndIndex % dwCursorIndex
+		//	% csbiConsole.dwCursorPosition.X % csbiConsole.dwCursorPosition.Y
+		//	% m_pOldScreenBuffer[dwNewDataStartIndex].Char.UnicodeChar
+		//	% pScreenBuffer[dwNewDataStartIndex].Char.UnicodeChar
+		//	).str().c_str()), L"ConsoleHook", MB_OK);
 	}
 
 	// check if cursor is beyond end of new data.
@@ -397,7 +412,6 @@ void ConsoleHandler::ReadConsoleBuffer()
 
 			//bNewDataFound = true;
 		}
-
 		//wformat debug(L"cursor index = %1% (was %2%), old data end index = %3%");
 		//MessageBox(NULL, reinterpret_cast<LPCWSTR>((
 		//	debug % dwCursorIndex % m_dwOldCursorIndex % m_dwOldNewDataEndIndex
@@ -421,12 +435,13 @@ void ConsoleHandler::ReadConsoleBuffer()
 			m_consoleBufferInfo->bNewDataFound = true;
 			m_consoleBufferInfo->bCursorPositionChanged = (dwCursorIndex != m_dwOldCursorIndex);
 
-			wformat debug(L"start index of buffer = %1%");
-			MessageBox(NULL, reinterpret_cast<LPCWSTR>((
-				debug % dwCmpStartIndex
-				).str().c_str()), L"ConsoleHook", MB_OK);
+			//wformat debug(L"start index of buffer = %1%");
+			//MessageBox(NULL, reinterpret_cast<LPCWSTR>((
+			//	debug % dwCmpStartIndex
+			//	).str().c_str()), L"ConsoleHook", MB_OK);
 
-			dwNewDataEndIndex -= dwCmpStartIndex; // PARTIALLY FIXES PROBLEMS! Run test to see effects.
+			// Note: partially fixes problems that occur when console scrolls downwards?
+			dwNewDataEndIndex -= dwCmpStartIndex;
 
 			// check if new data is of zero length
 			if (dwNewDataStartIndex - 1 == dwNewDataEndIndex)

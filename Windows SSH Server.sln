@@ -6,13 +6,16 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSH.NET", "SSH.NET\SSH.NET.csproj", "{B391E414-FEBF-4A0C-970B-5A4596ED597A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server Manager", "Server Manager\Server Manager.csproj", "{D73F90E0-2AC5-415D-B7A0-AD02EE53FDAD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{A17BA7C0-9ACC-4CAB-B38F-EFDF39368BE5} = {A17BA7C0-9ACC-4CAB-B38F-EFDF39368BE5}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console.NET", "Console.NET\Console.NET.csproj", "{BD960392-CED7-4506-B550-6134D53F4F65}"
 	ProjectSection(ProjectDependencies) = postProject
 		{69234D74-7133-48FF-8DDB-9901FFC4D7FF} = {69234D74-7133-48FF-8DDB-9901FFC4D7FF}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleHook", "ConsoleHook\ConsoleHook\ConsoleHook.vcproj", "{69234D74-7133-48FF-8DDB-9901FFC4D7FF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleHook", "ConsoleHook\ConsoleHook.vcproj", "{69234D74-7133-48FF-8DDB-9901FFC4D7FF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Project", "Project", "{E31E4125-194B-4382-BF39-4BFABE36D167}"
 	ProjectSection(SolutionItems) = preProject

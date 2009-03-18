@@ -38,11 +38,11 @@
   <ItemGroup>
     <Reference Include="DiffieHellman, Version=1.0.0.31658, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\DiffieHellman.dll</HintPath>
+      <HintPath>..\Libraries\DiffieHellman.dll</HintPath>
     </Reference>
     <Reference Include="DotZLib, Version=1.0.2965.34405, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\DotZLib.dll</HintPath>
+      <HintPath>..\Libraries\DotZLib.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
@@ -58,7 +58,7 @@
     <Reference Include="System.Xml" />
     <Reference Include="Twofish, Version=1.0.2965.36651, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Twofish.dll</HintPath>
+      <HintPath>..\Libraries\Twofish.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -124,6 +124,7 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
-    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll</PostBuildEvent>
+    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll
+call "$(SolutionDir)Scripts\robocopy-check-errors.bat"</PostBuildEvent>
   </PropertyGroup>
 </Project>

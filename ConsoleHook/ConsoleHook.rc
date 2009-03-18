@@ -72,7 +72,7 @@ BEGIN
             VALUE "FileDescription", "Hook module for Win32 Console processes"
             VALUE "FileVersion", "0.1.0"
             VALUE "InternalName", "ConsoleHook"
-            VALUE "LegalCopyright", "Copyright © 2009 Alex Regueiro (Original Version Copyright © 2001-2008 Marko Bozikovic)"
+            VALUE "LegalCopyright", "Copyright © 2009 Alex Regueiro (Original Code Copyright © 2001-2008 Marko Bozikovic)"
             VALUE "ProductName", "Console.NET"
             VALUE "ProductVersion", "2.00.00.138"
         END

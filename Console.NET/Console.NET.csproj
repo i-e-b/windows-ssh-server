@@ -72,6 +72,7 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
-    <PostBuildEvent>robocopy "$(SolutionDir)ConsoleHook\bin\Release\." . ConsoleHook.dll</PostBuildEvent>
+    <PostBuildEvent>robocopy "$(SolutionDir)ConsoleHook\bin\Release\." . ConsoleHook.dll
+call "$(SolutionDir)Scripts\robocopy-check-errors.bat"</PostBuildEvent>
   </PropertyGroup>
 </Project>

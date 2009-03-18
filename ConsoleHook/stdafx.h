@@ -34,8 +34,8 @@ using namespace std;
 using namespace boost;
 #pragma warning(pop)
 
-#include "../shared/SharedMemory.h"
-#include "../shared/Structures.h"
+#include "shared/SharedMemory.h"
+#include "shared/Structures.h"
 
 //////////////////////////////////////////////////////////////////////////////
 

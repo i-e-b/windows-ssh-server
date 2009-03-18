@@ -142,6 +142,7 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
-    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll</PostBuildEvent>
+    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll
+call "$(SolutionDir)Scripts\robocopy-check-errors.bat"</PostBuildEvent>
   </PropertyGroup>
 </Project>

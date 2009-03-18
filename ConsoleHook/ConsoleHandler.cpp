@@ -2,7 +2,7 @@
 using namespace std;
 using namespace boost;
 
-#include "../shared/SharedMemNames.h"
+#include "shared/SharedMemNames.h"
 #include "ConsoleHandler.h"
 #include "Helper.h"
 

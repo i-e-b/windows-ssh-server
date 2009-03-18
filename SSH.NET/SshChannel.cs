@@ -9,15 +9,6 @@ namespace SshDotNet
 {
     public abstract class SshChannel : IDisposable, INotifyPropertyChanged
     {
-        public event EventHandler<EventArgs> Opened;
-        public event EventHandler<EventArgs> EofSent;
-        public event EventHandler<EventArgs> EofReceived;
-        public event EventHandler<EventArgs> Closed;
-        public event EventHandler<EventArgs> WindowAdjust;
-        public event EventHandler<DataReceivedEventArgs> DataReceived;
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
         protected bool _open;                        // True if channel is currently open.
         protected bool _eofSent;                     // True if EOF (end of file) message has been sent.
         protected bool _eofReceived;                 // True if EOF (end of file) message has been received.
@@ -70,6 +61,20 @@ namespace SshDotNet
 
             _isDisposed = true;
         }
+
+        public event EventHandler<EventArgs> Opened;
+
+        public event EventHandler<EventArgs> EofSent;
+
+        public event EventHandler<EventArgs> EofReceived;
+
+        public event EventHandler<EventArgs> Closed;
+
+        public event EventHandler<EventArgs> WindowAdjust;
+
+        public event EventHandler<DataReceivedEventArgs> DataReceived;
+
+        public event PropertyChangedEventHandler PropertyChanged;
 
         public bool IsOpen
         {

@@ -18,8 +18,8 @@ namespace SshDotNet
         static SshClient()
         {
             // Set default software version.
-            SshClient.SoftwareVersion = "WindowsSshServer_"
-                + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            SshClient.SoftwareVersion = "WindowsSshServer" + 
+                Assembly.GetExecutingAssembly().GetName().Version.ToString();
         }
 
         public static string SoftwareVersion
@@ -27,12 +27,6 @@ namespace SshDotNet
             get;
             set;
         }
-
-        public event EventHandler<EventArgs> Connected;
-        public event EventHandler<SshDisconnectedEventArgs> Disconnected;
-        public event EventHandler<EventArgs> Error;
-        public event EventHandler<SshDebugMessageReceivedEventArgs> DebugMessageReceived;
-        public event EventHandler<SshKeyExchangeInitializedEventArgs> KeyExchangeInitialized;
 
         protected const string _protocolVersion = "2.0"; // Implemented version of SSH protocol.
         protected const uint _maxPacketSize = 35000;     // Maximum total size of packet.
@@ -80,7 +74,7 @@ namespace SshDotNet
         protected Thread _receiveThread;                 // Thread on which to wait for received data.
 
         protected object _streamLock = new object();
-
+        
         private bool _isDisposed = false;                // True if object has been disposed.
 
         public SshClient(IConnection connection)
@@ -157,6 +151,16 @@ namespace SshDotNet
 
             _isDisposed = true;
         }
+
+        public event EventHandler<EventArgs> Connected;
+        
+        public event EventHandler<SshDisconnectedEventArgs> Disconnected;
+        
+        public event EventHandler<EventArgs> Error;
+        
+        public event EventHandler<SshDebugMessageReceivedEventArgs> DebugMessageReceived;
+        
+        public event EventHandler<SshKeyExchangeInitializedEventArgs> KeyExchangeInitialized;
 
         public List<SshService> Services
         {
@@ -633,8 +637,7 @@ namespace SshDotNet
                 // Check if currently using MAC algorithm.
                 if (_macAlgCtoS != null)
                 {
-                    // Read MAC (Message Authentication Code).
-                    // MAC is always unencrypted.
+                    // Read MAC (Message Authentication Code). MAC is always unencrypted.
                     mac = new byte[_macAlgCtoS.DigestLength];
                     int macBytesRead = ReadCryptoStreamBuffer(cachedStream, mac, 0);
                     int macBytesLeft = mac.Length - macBytesRead;
@@ -643,7 +646,7 @@ namespace SshDotNet
 
                     if (macBytesRead > 0)
                     {
-                        // Hack: recreate decryptor with correct IV.
+                        // HACK: Recreate decryptor with correct IV.
                         _cryptoTransformCtoS.Dispose();
                         _cryptoTransformCtoS = _encAlgCtoS.Algorithm.CreateDecryptor(_encAlgCtoS.Algorithm.Key,
                             cachedStream.GetBufferEnd(0, _cryptoTransformCtoS.InputBlockSize));
@@ -1608,8 +1611,7 @@ namespace SshDotNet
             // Disconnect with reason.
             Disconnect(SshDisconnectReason.ProtocolError, string.Format("Fatal error: {0}", ex.Message));
 
-            OnError(new SshErrorEventArgs(ex is SshException ? (SshException)ex
-                : new SshException("A fatal error has occurred.", ex)));
+            OnError(new SshErrorEventArgs(new SshException("A fatal error has occurred.", ex)));
         }
 
         protected virtual void OnConnected(EventArgs e)
@@ -1677,11 +1679,6 @@ namespace SshDotNet
                     ReadPacket();
                 }
             }
-            catch (SshException exSsh)
-            {
-                // Fatal error has occurred.
-                FatalErrorOccurred(exSsh);
-            }
             catch (DisconnectedException)
             {
                 // Ignore.
@@ -1695,18 +1692,16 @@ namespace SshDotNet
             {
                 // Thread has been aborted.
             }
-            catch (Exception ex)
-            {
-                // Let connection object handle exception.
-                var exHandled = _connection.HandleException(this, ex);
+            //catch (Exception ex)
+            //{
+            //    // Let connection object handle exception.
+            //    var exHandled = _connection.HandleException(this, ex);
 
-                if (!exHandled)
-                    // Fatal error has occurred.
-                    FatalErrorOccurred(ex);
-            }
+            //    if (!exHandled)
+            //        FatalErrorOccurred(ex);
+            //}
             finally
             {
-                // Check if object has already been disposed.
                 if (!_isDisposed)
                 {
                     // Disconnect from client.

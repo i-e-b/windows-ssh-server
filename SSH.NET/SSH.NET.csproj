@@ -110,9 +110,6 @@
     <None Include="SSH.NET.pfx" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\Libraries\zlib1.dll">
-      <Link>zlib1.dll</Link>
-    </Content>
     <Content Include="Info\Public Key Formats.txt" />
     <Content Include="Info\SSH_MSG_KEXINIT_0.txt" />
   </ItemGroup>
@@ -124,4 +121,9 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll</PostBuildEvent>
+  </PropertyGroup>
 </Project>

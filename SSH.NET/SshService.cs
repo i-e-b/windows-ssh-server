@@ -7,9 +7,6 @@ namespace SshDotNet
 {
     public abstract class SshService : IDisposable
     {
-        public event EventHandler<EventArgs> Started;
-        public event EventHandler<EventArgs> Stopped;
-
         protected SshClient _client;      // Client for which service is running.
 
         private bool _isDisposed = false; // True if object has been disposed.
@@ -45,6 +42,10 @@ namespace SshDotNet
 
             _isDisposed = true;
         }
+        
+        public event EventHandler<EventArgs> Started;
+        
+        public event EventHandler<EventArgs> Stopped;
 
         public SshClient Client
         {

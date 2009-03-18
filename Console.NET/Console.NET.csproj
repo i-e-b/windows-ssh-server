@@ -57,10 +57,6 @@
     <Compile Include="WinApi.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\ConsoleHook\bin\Release\ConsoleHook.dll">
-      <Link>ConsoleHook.dll</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <Content Include="..\Images\Main.ico">
       <Link>Main.ico</Link>
     </Content>
@@ -73,4 +69,9 @@
   <Target Name="AfterBuild">
   </Target>
   -->
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+    <PostBuildEvent>robocopy "$(SolutionDir)ConsoleHook\bin\Release\." . ConsoleHook.dll</PostBuildEvent>
+  </PropertyGroup>
 </Project>

@@ -42,6 +42,8 @@ namespace ConsoleDotNet
         {
             if (!_isDisposed)
             {
+                this.IsAvailable = false;
+
                 if (disposing)
                 {
                     // Dispose managed resources.
@@ -88,6 +90,12 @@ namespace ConsoleDotNet
 
                 return _sharedRespEvent;
             }
+        }
+
+        public bool IsAvailable
+        {
+            get;
+            protected set;
         }
 
         public bool IsDisposed
@@ -152,11 +160,13 @@ namespace ConsoleDotNet
             if (_pSharedMemory == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(),
                 "Error getting bsae address of file mapping.");
 
-            // Zero file-mapped memory.
+            // Initialize file-mapped memory to zero.
             WinApi.ZeroMemory(_pSharedMemory, _size * Marshal.SizeOf(typeof(T)));
 
             // Create synchronisation objects.
             if (syncObjects != SyncObjectTypes.SyncObjNone) CreateSyncObjects(syncObjects, name);
+
+            this.IsAvailable = true;
         }
 
         public void Open(string name, SyncObjectTypes syncObjects)
@@ -179,6 +189,7 @@ namespace ConsoleDotNet
             // Create synchronisation objects.
             if (syncObjects != SyncObjectTypes.SyncObjNone) CreateSyncObjects(syncObjects, name);
 
+            this.IsAvailable = true;
         }
 
         private void CreateSyncObjects(SyncObjectTypes syncObjects, string name)

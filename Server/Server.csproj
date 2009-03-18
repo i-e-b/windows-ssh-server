@@ -120,7 +120,6 @@
     <Content Include="EventLogMsgs.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="zlib1.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Console.NET\Console.NET.csproj">
@@ -143,5 +142,6 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
+    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll</PostBuildEvent>
   </PropertyGroup>
 </Project>

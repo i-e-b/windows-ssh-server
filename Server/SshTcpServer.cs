@@ -10,9 +10,6 @@ namespace WindowsSshServer
 {
     public sealed class SshTcpServer : IDisposable
     {
-        public event EventHandler<ClientEventArgs> ClientConnected;
-        public event EventHandler<ClientEventArgs> ClientDisconnected;
-
         private TcpListener _tcpListener; // Listens for TCP connections from clients.
         private List<SshClient> _clients; // List of connected clients.
 
@@ -31,6 +28,10 @@ namespace WindowsSshServer
         {
             Dispose(false);
         }
+
+        public event EventHandler<ClientEventArgs> ClientConnected;
+
+        public event EventHandler<ClientEventArgs> ClientDisconnected;
 
         public List<SshClient> Clients
         {

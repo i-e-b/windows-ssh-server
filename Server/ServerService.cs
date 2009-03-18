@@ -17,10 +17,6 @@ namespace WindowsSshServer
 {
     public partial class ServerService : ServiceBase
     {
-        //protected delegate void LogClientEventHandler(SshClient client);
-
-        public event EventHandler<ChannelListChangedEventArgs> TerminalChannelListChanged;
-
         internal const string EventLogName = "Windows-Ssh-Server";
         internal const string EventSourceName = "Windows-Ssh-Server";
         internal const string KeysDirectory = @"../../../Keys/"; // Directory from which to load host keys.
@@ -73,6 +69,8 @@ namespace WindowsSshServer
 
             this.Disposed += new EventHandler(SshServerService_Disposed);
         }
+
+        public event EventHandler<ChannelListChangedEventArgs> TerminalChannelListChanged;
 
         public ReadOnlyCollection<SshWinConsoleChannel> AllTerminalChannels
         {
@@ -415,6 +413,8 @@ namespace WindowsSshServer
             // Dispose TCP server.
             _tcpServer.Dispose();
         }
+
+        //protected delegate void LogClientEventHandler(SshClient client);
     }
 
     public class ChannelListChangedEventArgs : ChannelEventArgs

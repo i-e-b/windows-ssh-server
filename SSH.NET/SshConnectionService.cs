@@ -9,11 +9,6 @@ namespace SshDotNet
 {
     public class SshConnectionService : SshService
     {
-        public event EventHandler<ChannelOpenRequestEventArgs> ChannelOpenRequest;
-        public event EventHandler<ChannelEventArgs> ChannelOpened;
-        public event EventHandler<ChannelEventArgs> ChannelClosed;
-        public event EventHandler<ChannelEventArgs> ChannelUpdated;
-
         protected List<SshChannel> _channels; // List of all currently open channels.
 
         private bool _isDisposed = false;     // True if object has been disposed.
@@ -46,6 +41,14 @@ namespace SshDotNet
                 base.Dispose(disposing);
             }
         }
+
+        public event EventHandler<ChannelOpenRequestEventArgs> ChannelOpenRequest;
+        
+        public event EventHandler<ChannelEventArgs> ChannelOpened;
+        
+        public event EventHandler<ChannelEventArgs> ChannelClosed;
+        
+        public event EventHandler<ChannelEventArgs> ChannelUpdated;
 
         public List<SshChannel> Channels
         {
@@ -382,9 +385,9 @@ namespace SshDotNet
                 case "tcpip-forward":
                     throw new NotImplementedException();
 
-                //if (wantReply) SendMsgRequestSuccess(null);
+                    //if (wantReply) SendMsgRequestSuccess(null);
 
-                //return;
+                    //return;
                 default:
                     // Unrecognised request type.
                     break;

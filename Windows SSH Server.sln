@@ -8,6 +8,9 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server Manager", "Server Manager\Server Manager.csproj", "{D73F90E0-2AC5-415D-B7A0-AD02EE53FDAD}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console.NET", "Console.NET\Console.NET.csproj", "{BD960392-CED7-4506-B550-6134D53F4F65}"
+	ProjectSection(ProjectDependencies) = postProject
+		{69234D74-7133-48FF-8DDB-9901FFC4D7FF} = {69234D74-7133-48FF-8DDB-9901FFC4D7FF}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleHook", "ConsoleHook\ConsoleHook\ConsoleHook.vcproj", "{69234D74-7133-48FF-8DDB-9901FFC4D7FF}"
 EndProject
@@ -25,6 +28,7 @@ Global
 		Release|Any CPU = Release|Any CPU
 		Release|Mixed Platforms = Release|Mixed Platforms
 		Release|Win32 = Release|Win32
+		Description = Contains SSH.NET library
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{A17BA7C0-9ACC-4CAB-B38F-EFDF39368BE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU

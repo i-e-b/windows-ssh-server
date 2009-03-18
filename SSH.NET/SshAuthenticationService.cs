@@ -23,17 +23,6 @@ namespace SshDotNet
             }
         }
 
-        public event EventHandler<AuthMethodRequestedEventArgs> AuthenticationMethodRequested;
-        public event EventHandler<AuthUserNoMethodEventArgs> AuthenticateUserNoMethod;
-        public event EventHandler<AuthUserPublicKeyEventArgs> AuthenticateUserPublicKey;
-        public event EventHandler<AuthUserPasswordEventArgs> AuthenticateUserPassword;
-        public event EventHandler<AuthUserHostBasedEventArgs> AuthenticateUserHostBased;
-        public event EventHandler<AuthUserKeyboardInteractiveEventArgs>
-            AuthenticateUserKeyboardInteractive;
-        public event EventHandler<ChangePasswordEventArgs> ChangePassword;
-        public event EventHandler<PromptInfoRequestedEventArgs> PromptInfoRequested;
-        public event EventHandler<EventArgs> UserAuthenticated;
-
         protected string _lastUserName;       // Last user name used for auth.
         protected string _lastServiceName;    // Last service name used for auth.
 
@@ -86,6 +75,24 @@ namespace SshDotNet
                 base.Dispose(disposing);
             }
         }
+
+        public event EventHandler<AuthMethodRequestedEventArgs> AuthenticationMethodRequested;
+        
+        public event EventHandler<AuthUserNoMethodEventArgs> AuthenticateUserNoMethod;
+        
+        public event EventHandler<AuthUserPublicKeyEventArgs> AuthenticateUserPublicKey;
+        
+        public event EventHandler<AuthUserPasswordEventArgs> AuthenticateUserPassword;
+        
+        public event EventHandler<AuthUserHostBasedEventArgs> AuthenticateUserHostBased;
+
+        public event EventHandler<AuthUserKeyboardInteractiveEventArgs> AuthenticateUserKeyboardInteractive;
+        
+        public event EventHandler<ChangePasswordEventArgs> ChangePassword;
+        
+        public event EventHandler<PromptInfoRequestedEventArgs> PromptInfoRequested;
+        
+        public event EventHandler<EventArgs> UserAuthenticated;
 
         public IList<AuthenticationMethod> AllowedAuthMethods
         {

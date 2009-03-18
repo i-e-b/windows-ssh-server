@@ -14,14 +14,6 @@ namespace ConsoleDotNet
 {
     public sealed class ConsoleHandler : IDisposable
     {
-        public event EventHandler<EventArgs> ConsoleOpened;
-        public event EventHandler<EventArgs> ConsoleClosed;
-        public event EventHandler<EventArgs> ConsoleWindowResized;
-        public event EventHandler<EventArgs> ConsoleBufferResized;
-        public event EventHandler<EventArgs> ConsoleNewData;
-        public event EventHandler<EventArgs> ConsoleBufferChanged;
-        public event EventHandler<EventArgs> ConsoleCursorPositionChanged;
-
         private SharedMemory<ConsoleParams> _consoleParams;
         private SharedMemory<CONSOLE_SCREEN_BUFFER_INFO> _consoleScreenInfo;
         private SharedMemory<CONSOLE_CURSOR_INFO> _consoleCursorInfo;
@@ -33,7 +25,7 @@ namespace ConsoleDotNet
         private SharedMemory<ConsoleSizeInfo> _consoleNewSizeInfo;
         private SharedMemory<SIZE> _consoleNewScrollPos;
 
-        private bool _consoleVisible;               // True if terminal window is currently visible.
+        private bool _consoleVisible; // True if terminal window is currently visible.
 
         private SafeWaitHandle _procSafeWaitHandle; // Wait handle that detects when process exits.
         private Thread _monitorThread;              // Thread for monitoring events received from console.
@@ -49,7 +41,7 @@ namespace ConsoleDotNet
 
         private object _disposeLock = new object();
 
-        private bool _isDisposed = false;           // True if object has been disposed.
+        private bool _isDisposed = false; // True if object has been disposed.
 
         public ConsoleHandler(string commandLine)
             : this()
@@ -101,16 +93,19 @@ namespace ConsoleDotNet
                         // Abort monitor thread.
                         if (_monitorThread != null) _monitorThread.Abort();
 
-                        // Close console window.
-                        unsafe
+                        if (_consoleParams.IsAvailable)
                         {
-                            ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
+                            // Close console window.
+                            unsafe
+                            {
+                                ConsoleParams* consoleParams = (ConsoleParams*)_consoleParams.Get();
 
-                            if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
-                                WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
-                                    IntPtr.Zero, IntPtr.Zero);
+                                if (consoleParams->ConsoleWindowHandle != IntPtr.Zero)
+                                    WinApi.SendMessage(consoleParams->ConsoleWindowHandle, WinApi.WM_CLOSE,
+                                        IntPtr.Zero, IntPtr.Zero);
+                            }
                         }
-
+                        
                         // Dispose shared memory objects.
                         if (_consoleParams != null) _consoleParams.Dispose();
                         if (_consoleScreenInfo != null) _consoleScreenInfo.Dispose();
@@ -137,6 +132,20 @@ namespace ConsoleDotNet
                 _isDisposed = true;
             }
         }
+
+        public event EventHandler<EventArgs> ConsoleOpened;
+
+        public event EventHandler<EventArgs> ConsoleClosed;
+
+        public event EventHandler<EventArgs> ConsoleWindowResized;
+
+        public event EventHandler<EventArgs> ConsoleBufferResized;
+
+        public event EventHandler<EventArgs> ConsoleNewData;
+
+        public event EventHandler<EventArgs> ConsoleBufferChanged;
+
+        public event EventHandler<EventArgs> ConsoleCursorPositionChanged;
 
         public SharedMemory<ConsoleParams> ConsoleParameters
         {
@@ -442,10 +451,8 @@ namespace ConsoleDotNet
                     while (WaitHandle.WaitAny(waitHandles) > 0)
                     {
                         // Get current window and buffer size.
-                        int columns = consoleScreenInfo->srWindow.Right
-                            - consoleScreenInfo->srWindow.Left + 1;
-                        int rows = consoleScreenInfo->srWindow.Bottom
-                            - consoleScreenInfo->srWindow.Top + 1;
+                        int columns = consoleScreenInfo->srWindow.Right - consoleScreenInfo->srWindow.Left + 1;
+                        int rows = consoleScreenInfo->srWindow.Bottom - consoleScreenInfo->srWindow.Top + 1;
                         int bufferColumns = consoleScreenInfo->dwSize.X;
                         int bufferRows = consoleScreenInfo->dwSize.Y;
 
@@ -533,7 +540,7 @@ namespace ConsoleDotNet
                 ref startupInfo, out _procInfo);
             if (!retValue) throw new Win32Exception(Marshal.GetLastWin32Error(),
                 "Unable to create new console process.");
-
+            
             _proc = Process.GetProcessById(_procInfo.dwProcessId);
 
             // Create objects in shared memory.

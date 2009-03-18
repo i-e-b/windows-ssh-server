@@ -17,18 +17,18 @@ namespace WindowsSshServer
             set;
         }
 
-        //protected SMALL_RECT _consoleOldWindow;         // Old window bounds of console.
-        //protected COORD _consoleOldCursorPos;           // Old position of cursor in console.
-        protected int _consoleOldBufferSize;            // Old size of new data in screen buffer.
-        protected int _consoleOldBufferStartIndex;      // Old start index of new data in screen buffer.
-        protected int _consoleOldBufferEndIndex;        // Old end index of new data in screen buffer.
-        protected int _consoleOldCursorIndex;           // Old index of cursor in console.
+        //protected SMALL_RECT _consoleOldWindow;  // Old window bounds of console.
+        //protected COORD _consoleOldCursorPos;    // Old position of cursor in console.
+        protected int _consoleOldBufferSize;       // Old size of new data in screen buffer.
+        protected int _consoleOldBufferStartIndex; // Old start index of new data in screen buffer.
+        protected int _consoleOldBufferEndIndex;   // Old end index of new data in screen buffer.
+        protected int _consoleOldCursorIndex;      // Old index of cursor in console.
 
-        //protected string _terminalTitle;                // Title of terminal instance.
-        protected Terminal _terminal;                   // Terminal, which translates sent and received data.
-        protected ConsoleHandler _consoleHandler;       // Handles Windows console.
+        //protected string _terminalTitle;         // Title of terminal instance.
+        protected Terminal _terminal;              // Terminal, which translates sent and received data.
+        protected ConsoleHandler _consoleHandler;  // Handles Windows console.
 
-        private bool _isDisposed = false;               // True if object has been disposed.
+        private bool _isDisposed = false;          // True if object has been disposed.
 
         public SshWinConsoleChannel(ChannelOpenRequestEventArgs requestEventArgs)
             : base(requestEventArgs)

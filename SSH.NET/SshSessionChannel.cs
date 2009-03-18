@@ -9,9 +9,6 @@ namespace SshDotNet
 {
     public class SshSessionChannel : SshChannel
     {
-        public event EventHandler<PseudoTerminalRequestedEventArgs> PseudoTerminalRequested;
-        public event EventHandler<EventArgs> PseudoTerminalAllocated;
-
         protected string _termEnvVar;                  // TERM environment variable.
         protected uint _termCharsWidth;                // Width of terminal, in chars.
         protected uint _termCharsHeight;               // Height of terminal, in chars.
@@ -54,6 +51,10 @@ namespace SshDotNet
                 base.Dispose(disposing);
             }
         }
+        
+        public event EventHandler<PseudoTerminalRequestedEventArgs> PseudoTerminalRequested;
+        
+        public event EventHandler<EventArgs> PseudoTerminalAllocated;
 
         public IEnumerable<KeyValuePair<string, string>> EnvironmentVars
         {

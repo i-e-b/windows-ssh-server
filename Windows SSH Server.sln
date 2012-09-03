@@ -10,7 +10,6 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server", "Server\Server.csproj", "{A17BA7C0-9ACC-4CAB-B38F-EFDF39368BE5}"
 	ProjectSection(ProjectDependencies) = postProject
 		{69234D74-7133-48FF-8DDB-9901FFC4D7FF} = {69234D74-7133-48FF-8DDB-9901FFC4D7FF}
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5} = {BB1EE0B1-1808-46CB-B786-949D91117FC5}
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SSH.NET", "SSH.NET\SSH.NET.csproj", "{B391E414-FEBF-4A0C-970B-5A4596ED597A}"
@@ -26,8 +25,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Console.NET", "Console.NET\
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConsoleHook", "ConsoleHook\ConsoleHook.vcxproj", "{69234D74-7133-48FF-8DDB-9901FFC4D7FF}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DotZLib", "Libraries\dotzlib\DotZLib\DotZLib.csproj", "{BB1EE0B1-1808-46CB-B786-949D91117FC5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -118,22 +115,6 @@ Global
 		{69234D74-7133-48FF-8DDB-9901FFC4D7FF}.Release|Win32.Build.0 = Release|Win32
 		{69234D74-7133-48FF-8DDB-9901FFC4D7FF}.Release|x64.ActiveCfg = Release|Win32
 		{69234D74-7133-48FF-8DDB-9901FFC4D7FF}.Release|x86.ActiveCfg = Release|Win32
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|Any CPU.ActiveCfg = Debug|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|Mixed Platforms.Build.0 = Debug|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|Win32.ActiveCfg = Debug|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|x64.ActiveCfg = Debug|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|x64.Build.0 = Debug|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|x86.ActiveCfg = Debug|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Debug|x86.Build.0 = Debug|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|Any CPU.ActiveCfg = Release|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|Mixed Platforms.ActiveCfg = Release|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|Mixed Platforms.Build.0 = Release|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|Win32.ActiveCfg = Release|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|x64.ActiveCfg = Release|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|x64.Build.0 = Release|x64
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|x86.ActiveCfg = Release|x86
-		{BB1EE0B1-1808-46CB-B786-949D91117FC5}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

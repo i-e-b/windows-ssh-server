@@ -5,14 +5,14 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
-using DotZLib;
+using System.IO.Compression;
 
 namespace SshDotNet.Algorithms
 {
     public class SshZlibCompression : CompressionAlgorithm
     {
-        protected Deflater _compressor;       // Compresses data.
-        protected Inflater _decompressor;     // Decompresses data.
+        protected DeflateStream compressedStream;       // Compresses data.
+        //protected Inflater _decompressor;     // Decompresses data.
         protected MemoryStream _outputStream; // Stream to which to output data.
 
         private bool _isDisposed = false;     // True if object has been disposed.
@@ -20,11 +20,11 @@ namespace SshDotNet.Algorithms
         public SshZlibCompression()
             : base()
         {
-            _compressor = new Deflater(CompressLevel.Default);
-            _compressor.DataAvailable += new DataAvailableHandler(_compressor_DataAvailable);
+            //_compressor = new DeflateStream(
+            //_compressor.DataAvailable += new DataAvailableHandler(_compressor_DataAvailable);
 
-            _decompressor = new Inflater();
-            _decompressor.DataAvailable += new DataAvailableHandler(_decompressor_DataAvailable);
+            //_decompressor = new Inflater();
+            //_decompressor.DataAvailable += new DataAvailableHandler(_decompressor_DataAvailable);
         }
 
         protected override void Dispose(bool disposing)
@@ -36,8 +36,8 @@ namespace SshDotNet.Algorithms
                     if (disposing)
                     {
                         // Dispose managed resources.
-                        if (_compressor != null) _compressor.Dispose();
-                        if (_decompressor != null) _decompressor.Dispose();
+                        //if (_compressor != null) _compressor.Dispose();
+                        //if (_decompressor != null) _decompressor.Dispose();
                     }
 
                     // Dispose unmanaged resources.
@@ -58,34 +58,40 @@ namespace SshDotNet.Algorithms
 
         public override byte[] Compress(byte[] input)
         {
-            lock (_compressor)
+            //lock (_compressor)
             {
                 using (_outputStream = new MemoryStream())
                 {
                     // Write input data to compressor.
-                    _compressor.Add(input);
-                    _compressor.Finish();
-                 
+                    compressedStream = new DeflateStream(_outputStream, CompressionMode.Compress);
+                    compressedStream.Write(input, 0, input.Length);
 
+                    byte[] buffer = null;
+                    _outputStream.Read(buffer, 0, (int)_outputStream.Length);
                     // Return compressed data.
-                    return _outputStream.ToArray();
+                    return buffer;
                 }
             }
         }
 
         public override byte[] Decompress(byte[] input)
         {
-            lock (_decompressor)
-            {
-                using (_outputStream = new MemoryStream())
-                {
-                    // Write input data to decompressor.
-                    _decompressor.Add(input);
-                    _decompressor.Finish();
+            
+            int bytesread = 0;
+            int totalread = 0;
+            byte[] buffer = new byte[65536];
+            MemoryStream outStream = new MemoryStream();
 
-                    // Return decompressed data.
-                    return _outputStream.ToArray();
-                }
+            using (DeflateStream uncompressStream = new DeflateStream(new MemoryStream(input), CompressionMode.Decompress))
+            {
+                do
+                {
+                    bytesread = uncompressStream.Read(buffer, 0, buffer.Length);
+                    totalread += bytesread;
+                    outStream.Write(buffer, 0, bytesread);
+                } while (bytesread > 0);
+                outStream.Flush();
+                return outStream.ToArray();
             }
         }
 
@@ -96,7 +102,7 @@ namespace SshDotNet.Algorithms
 
         private void _compressor_DataAvailable(byte[] data, int startIndex, int count)
         {
-            lock (_compressor)
+            //lock (_compressor)
             {
                 // Write compressed data to output stream.
                 _outputStream.Write(data, startIndex, count);
@@ -105,7 +111,7 @@ namespace SshDotNet.Algorithms
 
         private void _decompressor_DataAvailable(byte[] data, int startIndex, int count)
         {
-            lock (_decompressor)
+            //lock (_decompressor)
             {
                 // Write decompressed data to output stream.
                 _outputStream.Write(data, startIndex, count);

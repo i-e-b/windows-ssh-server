@@ -74,7 +74,7 @@ namespace WindowsSshServer
             {
                 if (_isDisposed) throw new ObjectDisposedException(this.GetType().FullName);
 
-                lock (_listenerLock)
+                //lock (_listenerLock)
                 {
                     return (_tcpListener != null);
                 }
@@ -164,7 +164,7 @@ namespace WindowsSshServer
             // Check that operation has completed.
             if (!ar.IsCompleted) return;
 
-            lock (_listenerLock)
+            //lock (_listenerLock)
             {
                 // Check that operation used current TCP listener.
                 if (ar.AsyncState != _tcpListener || _tcpListener == null) return;

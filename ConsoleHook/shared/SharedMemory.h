@@ -57,12 +57,12 @@ class SharedMemory
 
 		wstring				m_strName;
 
-		shared_ptr<void>	m_hSharedMem;
-		shared_ptr<T>		m_pSharedMem;
+		boost::shared_ptr<void>	m_hSharedMem;
+		boost::shared_ptr<T>		m_pSharedMem;
 
-		shared_ptr<void>	m_hSharedMutex;
-		shared_ptr<void>	m_hSharedReqEvent;
-		shared_ptr<void>	m_hSharedRespEvent;
+		boost::shared_ptr<void>	m_hSharedMutex;
+		boost::shared_ptr<void>	m_hSharedReqEvent;
+		boost::shared_ptr<void>	m_hSharedRespEvent;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -86,7 +86,7 @@ class SharedMemoryLock
 
 	private:
 
-		shared_ptr<void>	m_lock;
+		boost::shared_ptr<void>	m_lock;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -165,7 +165,7 @@ void SharedMemory<T>::Create(const wstring& strName, DWORD dwSize, SyncObjectTyp
 	m_strName	= strName;
 	m_dwSize	= dwSize;
 
-	m_hSharedMem = shared_ptr<void>(::CreateFileMapping(
+	m_hSharedMem= boost::shared_ptr<void>(::CreateFileMapping(
 										INVALID_HANDLE_VALUE, 
 										NULL, 
 										PAGE_READWRITE, 
@@ -177,7 +177,7 @@ void SharedMemory<T>::Create(const wstring& strName, DWORD dwSize, SyncObjectTyp
 	// TODO: error handling
 	//if (m_hSharedMem.get() == NULL) return false;
 
-	m_pSharedMem = shared_ptr<T>(static_cast<T*>(::MapViewOfFile(
+	m_pSharedMem= boost::shared_ptr<T>(static_cast<T*>(::MapViewOfFile(
 													m_hSharedMem.get(), 
 													FILE_MAP_ALL_ACCESS, 
 													0, 
@@ -202,7 +202,7 @@ void SharedMemory<T>::Open(const wstring& strName, SyncObjectTypes syncObjects)
 {
 	m_strName	= strName;
 
-	m_hSharedMem = shared_ptr<void>(::OpenFileMapping(
+	m_hSharedMem = boost::shared_ptr<void>(::OpenFileMapping(
 										FILE_MAP_ALL_ACCESS, 
 										FALSE, 
 										m_strName.c_str()),
@@ -211,7 +211,7 @@ void SharedMemory<T>::Open(const wstring& strName, SyncObjectTypes syncObjects)
 	// TODO: error handling
 	//if (m_hSharedMem.get() == NULL) return false;
 
-	m_pSharedMem = shared_ptr<T>(static_cast<T*>(::MapViewOfFile(
+	m_pSharedMem = boost::shared_ptr<T>(static_cast<T*>(::MapViewOfFile(
 													m_hSharedMem.get(), 
 													FILE_MAP_ALL_ACCESS, 
 													0, 
@@ -368,18 +368,18 @@ void SharedMemory<T>::CreateSyncObjects(SyncObjectTypes syncObjects, const wstri
 {
 	if (syncObjects >= syncObjRequest)
 	{
-		m_hSharedMutex = shared_ptr<void>(
+		m_hSharedMutex= boost::shared_ptr<void>(
 							::CreateMutex(NULL, FALSE, (strName + wstring(L"_mutex")).c_str()),
 							::CloseHandle);
 
-		m_hSharedReqEvent = shared_ptr<void>(
+		m_hSharedReqEvent= boost::shared_ptr<void>(
 							::CreateEvent(NULL, FALSE, FALSE, (strName + wstring(L"_req_event")).c_str()),
 							::CloseHandle);
 	}
 
 	if (syncObjects >= syncObjBoth)
 	{
-		m_hSharedRespEvent = shared_ptr<void>(
+		m_hSharedRespEvent= boost::shared_ptr<void>(
 							::CreateEvent(NULL, FALSE, FALSE, (strName + wstring(L"_resp_event")).c_str()),
 							::CloseHandle);
 	}

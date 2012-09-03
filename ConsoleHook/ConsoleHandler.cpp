@@ -1,7 +1,5 @@
 #include "stdafx.h"
 using namespace std;
-using namespace boost;
-
 #include "shared/SharedMemNames.h"
 #include "ConsoleHandler.h"
 #include "Helper.h"
@@ -29,7 +27,7 @@ ConsoleHandler::ConsoleHandler()
 , m_newConsoleSize()
 , m_newScrollPos()
 , m_hMonitorThread()
-, m_hMonitorThreadExit(shared_ptr<void>(::CreateEvent(NULL, FALSE, FALSE, NULL), ::CloseHandle))
+, m_hMonitorThreadExit(boost::shared_ptr<void>(::CreateEvent(NULL, FALSE, FALSE, NULL), ::CloseHandle))
 , m_dwOldScreenBufferSize(0)
 , m_nOldReadAreaTop(0)
 , m_nOldReadAreaBottom(0)
@@ -57,7 +55,7 @@ ConsoleHandler::~ConsoleHandler()
 DWORD ConsoleHandler::StartMonitorThread()
 {
 	DWORD dwThreadId = 0;
-	m_hMonitorThread = shared_ptr<void>(
+	m_hMonitorThread =boost::shared_ptr<void>(
 							::CreateThread(
 								NULL,
 								0, 
@@ -140,7 +138,7 @@ void ConsoleHandler::ReadConsoleBuffer()
 {
 	// we take a fresh STDOUT handle - seems to work better (in case a program
 	// has opened a new screen output buffer)
-	shared_ptr<void> hStdOut(
+boost::shared_ptr<void> hStdOut(
 						::CreateFile(
 							L"CONOUT$",
 							GENERIC_WRITE | GENERIC_READ,
@@ -757,7 +755,7 @@ void ConsoleHandler::CopyConsoleText()
 
 //	TRACE(L"Copy request: %ix%i - %ix%i\n", coordStart.X, coordStart.Y, coordEnd.X, coordEnd.Y);
 
-	shared_ptr<void> hStdOut(
+boost::shared_ptr<void> hStdOut(
 						::CreateFile(
 							L"CONOUT$",
 							GENERIC_WRITE | GENERIC_READ,
@@ -888,7 +886,7 @@ void ConsoleHandler::CopyConsoleText()
 
 //////////////////////////////////////////////////////////////////////////////
 
-void ConsoleHandler::PasteConsoleText(HANDLE hStdIn, const shared_ptr<wchar_t>& pszPasteBuffer)
+void ConsoleHandler::PasteConsoleText(HANDLE hStdIn, const boost::shared_ptr<wchar_t>& pszPasteBuffer)
 {
 	wchar_t*	pszText	= NULL;
 	HANDLE		hData	= NULL;
@@ -1230,7 +1228,7 @@ DWORD ConsoleHandler::MonitorThread()
 	if (!OpenSharedObjects()) return 0;
 	
 	// read parent process ID and get process handle
-	m_hParentProcess = shared_ptr<void>(
+	m_hParentProcess =boost::shared_ptr<void>(
 							::OpenProcess(PROCESS_ALL_ACCESS, FALSE, m_consoleParams->dwParentProcessId),
 							::CloseHandle);
 
@@ -1242,7 +1240,7 @@ DWORD ConsoleHandler::MonitorThread()
 */
 
 
-	shared_ptr<void> hStdOut(
+boost::shared_ptr<void> hStdOut(
 						::CreateFile(
 							L"CONOUT$",
 							GENERIC_WRITE | GENERIC_READ,
@@ -1253,7 +1251,7 @@ DWORD ConsoleHandler::MonitorThread()
 							0),
 							::CloseHandle);
 
-	shared_ptr<void> hStdIn(
+boost::shared_ptr<void> hStdIn(
 						::CreateFile(
 							L"CONIN$",
 							GENERIC_WRITE | GENERIC_READ,
@@ -1350,7 +1348,7 @@ DWORD ConsoleHandler::MonitorThread()
 			{
 				SharedMemoryLock memLock(m_consolePasteInfo);
 
-				shared_ptr<wchar_t>	pszPasteBuffer;
+			boost::shared_ptr<wchar_t>	pszPasteBuffer;
 
 				/*MessageBox(NULL, reinterpret_cast<LPCWSTR>((SharedMemNames::formatConsoleParams
 					% (unsigned long) m_consolePasteInfo.Get()).str().c_str()), 
@@ -1363,7 +1361,7 @@ DWORD ConsoleHandler::MonitorThread()
 				{
 					pszPasteBuffer.reset(
 									reinterpret_cast<wchar_t*>(*m_consolePasteInfo.Get()),
-									bind<BOOL>(::VirtualFreeEx, ::GetCurrentProcess(), _1, NULL, MEM_RELEASE));
+									boost::bind<BOOL>(::VirtualFreeEx, ::GetCurrentProcess(), _1, NULL, MEM_RELEASE));
 				}
 
 				PasteConsoleText(hStdIn.get(), pszPasteBuffer);

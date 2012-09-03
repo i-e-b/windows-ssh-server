@@ -26,4 +26,8 @@ packages/
 *.testsettings
 *.vsmdi
 
+*_UpgradeReport_*
+*/Debug/*
+*/Release/*
+*.user
 

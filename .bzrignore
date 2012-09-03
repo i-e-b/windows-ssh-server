@@ -1,7 +1,0 @@
-~*
-*.suo
-*.user
-bin/
-obj/
-./push-*.ps1
-./*.InstallLog

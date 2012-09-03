@@ -64,7 +64,8 @@ namespace SshDotNet.Algorithms
                 {
                     // Write input data to compressor.
                     _compressor.Add(input);
-                    _compressor.PartialFlush();
+                    _compressor.Finish();
+                 
 
                     // Return compressed data.
                     return _outputStream.ToArray();
@@ -80,7 +81,7 @@ namespace SshDotNet.Algorithms
                 {
                     // Write input data to decompressor.
                     _decompressor.Add(input);
-                    _decompressor.PartialFlush();
+                    _decompressor.Finish();
 
                     // Return decompressed data.
                     return _outputStream.ToArray();

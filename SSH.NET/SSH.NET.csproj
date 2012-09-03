@@ -10,10 +10,11 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>SshDotNet</RootNamespace>
     <AssemblyName>SshDotNet</AssemblyName>
-    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SignAssembly>false</SignAssembly>
-    <AssemblyOriginatorKeyFile>SSH.NET.pfx</AssemblyOriginatorKeyFile>
+    <AssemblyOriginatorKeyFile>
+    </AssemblyOriginatorKeyFile>
     <FileUpgradeFlags>
     </FileUpgradeFlags>
     <OldToolsVersion>3.5</OldToolsVersion>
@@ -33,6 +34,7 @@
     <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -60,10 +62,6 @@
     <Reference Include="DiffieHellman, Version=1.0.0.31658, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Libraries\DiffieHellman.dll</HintPath>
-    </Reference>
-    <Reference Include="DotZLib, Version=1.0.2965.34405, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\Libraries\DotZLib.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core">
@@ -128,7 +126,6 @@
   <ItemGroup>
     <None Include="Keys\dss-default.key" />
     <None Include="Keys\rsa-default.key" />
-    <None Include="SSH.NET.pfx" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Info\Public Key Formats.txt" />
@@ -151,6 +148,12 @@
       <Install>true</Install>
     </BootstrapperPackage>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Libraries\dotzlib\DotZLib\DotZLib.csproj">
+      <Project>{BB1EE0B1-1808-46CB-B786-949D91117FC5}</Project>
+      <Name>DotZLib</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
@@ -162,7 +165,5 @@
   <PropertyGroup>
     <PreBuildEvent>
     </PreBuildEvent>
-    <PostBuildEvent>robocopy "$(SolutionDir)Libraries\." . zlib1.dll
-call "$(SolutionDir)Scripts\robocopy-check-errors.bat"</PostBuildEvent>
   </PropertyGroup>
 </Project>

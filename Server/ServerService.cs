@@ -290,7 +290,7 @@ namespace WindowsSshServer
 
             e.Name = "Custom Authentication Method";
             e.Instruction = "Enter your password.";
-            e.Prompts = new[] { new AuthenticationPrompt("Password: ", true) };
+            e.Prompts = new[] { new AuthenticationPrompt("Password: ", false) };
 
             // Write to event log.
             LogClientEvent(authService.Client, "Prompt info request sent.", EventLogEntryType.Information);

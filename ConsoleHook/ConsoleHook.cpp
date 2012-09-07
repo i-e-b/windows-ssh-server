@@ -28,17 +28,19 @@ BOOL APIENTRY DllMain(HANDLE hModule, DWORD ul_reason_for_call, LPVOID /* lpRese
 			g_hModule = (HMODULE)hModule;
 			g_consoleHandler.StartMonitorThread();
 
-			//MessageBox(NULL, L"DLL LOADED", L"ConsoleHook", MB_OK);
+			MessageBox(NULL, L"DLL LOADED", L"ConsoleHook", MB_OK);
 
 			break;
 		}
 
 		case DLL_THREAD_ATTACH:
+			MessageBox(NULL, L"DLL Attached", L"ConsoleHook", MB_OK);
 			break;
 
-			//MessageBox(NULL, L"DLL UNLOADED", L"ConsoleHook", MB_OK);
+			
 
 		case DLL_THREAD_DETACH:
+			MessageBox(NULL, L"DLL UNLOADED", L"ConsoleHook", MB_OK);
 			break;
 
 		case DLL_PROCESS_DETACH:
